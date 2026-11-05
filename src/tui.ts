@@ -27,7 +27,7 @@ type HubStatus = {
 };
 
 type AppStatus = {
-  whatsapp: { state: string; phoneNumber: string | null };
+  memory: { total: number };
   agent: { botName: string; model: string };
   server: { uptime: number };
 };
@@ -171,7 +171,7 @@ async function main(): Promise<void> {
     out.push(line(`${BOLD}${CYAN}WhatsApp Agent Hub${RESET} ${DIM}· ${config.appUrl}${RESET}`));
     out.push(
       line(
-        `${DIM}classic WhatsApp:${RESET} ${app.whatsapp.state} ${DIM}(${app.whatsapp.phoneNumber || 'not linked'})${RESET}` +
+        `${DIM}memories:${RESET} ${app.memory.total}` +
           `   ${DIM}OpenCode:${RESET} ${status.runtime.ready ? `${GREEN}ready${RESET}` : `${YELLOW}idle${RESET}`}` +
           `   ${DIM}polling:${RESET} ${status.running}/${status.agents.length}`,
       ),

@@ -2,11 +2,46 @@ import { db, transaction } from './db.js';
 import { deleteSecret, getSecret, hasSecret, setSecret } from './secrets.js';
 import { newId, nowIso } from './util.js';
 
-export type HubAgent = {
+export type AgentCapabilities = {
+  /** Allow the agent to fetch web pages. */
+  webfetch: boolean;
+  /** Allow the agent to run web searches. */
+  websearch: boolean;
+};
+
+export type AgentProfile = {
+  title: string;
+  roleDescription: string;
+  personality: string;
+  communicationStyle: string;
+  objectives: string;
+  operatingPrinciples: string;
+  decisionStyle: string;
+  avatar: string | null;
+  color: string;
+};
+
+export const PROFILE_TEXT_FIELDS = [
+  'title',
+  'roleDescription',
+  'personality',
+  'communicationStyle',
+  'objectives',
+  'operatingPrinciples',
+  'decisionStyle',
+] as const;
+
+export type HubAgent = AgentProfile & {
   id: string;
   name: string;
   model: string;
   systemPrompt: string;
+  capabilities: AgentCapabilities;
+  memoryEnabled: boolean;
+  /** Optional verified owner peer id. Schedules and dashboard sends go here instead of the first sender. */
+  ownerId: string | null;
+  memoryCount: number;
+  privateKnowledgeCount: number;
   enabled: boolean;
   autoStart: boolean;
   typingIndicator: boolean;
@@ -71,8 +106,21 @@ type AgentRow = {
   last_seen_at: string | null;
   created_at: string;
   updated_at: string;
+  title: string;
+  role_description: string;
+  personality: string;
+  communication_style: string;
+  objectives: string;
+  operating_principles: string;
+  decision_style: string;
+  avatar: string | null;
+  color: string;
+  capabilities: string;
+  memory_enabled: number;
+  owner_id: string | null;
   skill_count?: number;
   schedule_count?: number;
+  memory_count?: number;
 };
 
 type SkillRow = {
@@ -110,7 +158,10 @@ export type CreateAgentInput = {
   token?: string | null;
   mcpServerIds?: string[];
   knowledgeIds?: string[];
-};
+  capabilities?: Partial<AgentCapabilities>;
+  memoryEnabled?: boolean;
+  ownerId?: string | null;
+} & Partial<AgentProfile>;
 
 export type UpdateAgentInput = Partial<Omit<CreateAgentInput, 'token'>> & {
   token?: string | null;
@@ -124,15 +175,36 @@ function tokenKey(agentId: string): string {
   return `hub_agent_token:${agentId}`;
 }
 
+function parseCapabilities(value: string | null | undefined): AgentCapabilities {
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = value ? (JSON.parse(value) as Record<string, unknown>) : {};
+  } catch {
+    parsed = {};
+  }
+  return { webfetch: parsed.webfetch === true, websearch: parsed.websearch === true };
+}
+
 function agentRowToRecord(row: AgentRow): HubAgent {
   const mcpRows = db
     .prepare('SELECT server_id FROM hub_agent_mcp WHERE agent_id = ? AND enabled = 1')
     .all(row.id) as unknown as Array<{ server_id: string }>;
+  // Linked shared documents plus the agent's own private documents. Documents that are
+  // private to another agent are never returned, even if a stale link exists.
   const knowledgeRows = db
-    .prepare('SELECT document_id FROM hub_agent_knowledge WHERE agent_id = ?')
-    .all(row.id) as unknown as Array<{ document_id: string }>;
+    .prepare(
+      `SELECT k.document_id AS id FROM hub_agent_knowledge k
+         JOIN knowledge_documents d ON d.id = k.document_id
+        WHERE k.agent_id = ? AND (d.owner_agent_id IS NULL OR d.owner_agent_id = ?)
+       UNION
+       SELECT id FROM knowledge_documents WHERE owner_agent_id = ?`,
+    )
+    .all(row.id, row.id, row.id) as unknown as Array<{ id: string }>;
+  const privateCount = db
+    .prepare('SELECT COUNT(*) AS n FROM knowledge_documents WHERE owner_agent_id = ?')
+    .get(row.id) as { n: number };
   const session = db
-    .prepare('SELECT session_id FROM hub_sessions WHERE agent_id = ?')
+    .prepare('SELECT session_id FROM hub_sessions WHERE agent_id = ? ORDER BY updated_at DESC LIMIT 1')
     .get(row.id) as { session_id?: string } | undefined;
 
   let hasToken = false;
@@ -160,10 +232,24 @@ function agentRowToRecord(row: AgentRow): HubAgent {
     updatedAt: row.updated_at,
     hasToken,
     mcpServerIds: mcpRows.map((item) => item.server_id),
-    knowledgeIds: knowledgeRows.map((item) => item.document_id),
+    knowledgeIds: knowledgeRows.map((item) => item.id),
     sessionId: session?.session_id ?? null,
     skillCount: Number(row.skill_count ?? 0),
     scheduleCount: Number(row.schedule_count ?? 0),
+    title: row.title ?? '',
+    roleDescription: row.role_description ?? '',
+    personality: row.personality ?? '',
+    communicationStyle: row.communication_style ?? '',
+    objectives: row.objectives ?? '',
+    operatingPrinciples: row.operating_principles ?? '',
+    decisionStyle: row.decision_style ?? '',
+    avatar: row.avatar || null,
+    color: row.color || '#22c55e',
+    capabilities: parseCapabilities(row.capabilities),
+    memoryEnabled: row.memory_enabled === undefined ? true : Boolean(row.memory_enabled),
+    ownerId: row.owner_id || null,
+    memoryCount: Number(row.memory_count ?? 0),
+    privateKnowledgeCount: Number(privateCount.n ?? 0),
   };
 }
 
@@ -172,7 +258,8 @@ export function listAgents(): HubAgent[] {
     .prepare(
       `SELECT a.*,
          (SELECT COUNT(*) FROM hub_skills s WHERE s.agent_id = a.id) AS skill_count,
-         (SELECT COUNT(*) FROM hub_schedules c WHERE c.agent_id = a.id) AS schedule_count
+         (SELECT COUNT(*) FROM hub_schedules c WHERE c.agent_id = a.id) AS schedule_count,
+         (SELECT COUNT(*) FROM agent_memories m WHERE m.agent_id = a.id) AS memory_count
        FROM hub_agents a
        ORDER BY a.created_at ASC`,
     )
@@ -185,7 +272,8 @@ export function getAgent(id: string): HubAgent | null {
     .prepare(
       `SELECT a.*,
          (SELECT COUNT(*) FROM hub_skills s WHERE s.agent_id = a.id) AS skill_count,
-         (SELECT COUNT(*) FROM hub_schedules c WHERE c.agent_id = a.id) AS schedule_count
+         (SELECT COUNT(*) FROM hub_schedules c WHERE c.agent_id = a.id) AS schedule_count,
+         (SELECT COUNT(*) FROM agent_memories m WHERE m.agent_id = a.id) AS memory_count
        FROM hub_agents a WHERE a.id = ?`,
     )
     .get(id) as unknown as AgentRow | undefined;
@@ -238,10 +326,51 @@ export function createAgent(input: CreateAgentInput): HubAgent {
     timestamp,
     timestamp,
   );
+  writeProfile(id, {
+    title: input.title ?? '',
+    roleDescription: input.roleDescription ?? '',
+    personality: input.personality ?? '',
+    communicationStyle: input.communicationStyle ?? '',
+    objectives: input.objectives ?? '',
+    operatingPrinciples: input.operatingPrinciples ?? '',
+    decisionStyle: input.decisionStyle ?? '',
+    avatar: input.avatar || null,
+    color: input.color || '#22c55e',
+    capabilities: { webfetch: input.capabilities?.webfetch === true, websearch: input.capabilities?.websearch === true },
+    memoryEnabled: input.memoryEnabled !== false,
+    ownerId: input.ownerId?.trim() || null,
+  });
   if (input.token?.trim()) setAgentToken(id, input.token);
   if (input.mcpServerIds) setAgentMcpServers(id, input.mcpServerIds);
   if (input.knowledgeIds) setAgentKnowledge(id, input.knowledgeIds);
   return getAgent(id)!;
+}
+
+function writeProfile(
+  id: string,
+  profile: AgentProfile & { capabilities: AgentCapabilities; memoryEnabled: boolean; ownerId: string | null },
+): void {
+  db.prepare(
+    `UPDATE hub_agents SET
+       title = ?, role_description = ?, personality = ?, communication_style = ?, objectives = ?,
+       operating_principles = ?, decision_style = ?, avatar = ?, color = ?, capabilities = ?,
+       memory_enabled = ?, owner_id = ?
+     WHERE id = ?`,
+  ).run(
+    profile.title.trim(),
+    profile.roleDescription,
+    profile.personality,
+    profile.communicationStyle,
+    profile.objectives,
+    profile.operatingPrinciples,
+    profile.decisionStyle,
+    profile.avatar,
+    profile.color,
+    JSON.stringify(profile.capabilities),
+    profile.memoryEnabled ? 1 : 0,
+    profile.ownerId,
+    id,
+  );
 }
 
 export function updateAgent(id: string, patch: UpdateAgentInput): HubAgent | null {
@@ -272,6 +401,23 @@ export function updateAgent(id: string, patch: UpdateAgentInput): HubAgent | nul
     nowIso(),
     id,
   );
+  writeProfile(id, {
+    title: patch.title ?? current.title,
+    roleDescription: patch.roleDescription ?? current.roleDescription,
+    personality: patch.personality ?? current.personality,
+    communicationStyle: patch.communicationStyle ?? current.communicationStyle,
+    objectives: patch.objectives ?? current.objectives,
+    operatingPrinciples: patch.operatingPrinciples ?? current.operatingPrinciples,
+    decisionStyle: patch.decisionStyle ?? current.decisionStyle,
+    avatar: patch.avatar !== undefined ? patch.avatar || null : current.avatar,
+    color: patch.color || current.color,
+    capabilities: {
+      webfetch: patch.capabilities?.webfetch ?? current.capabilities.webfetch,
+      websearch: patch.capabilities?.websearch ?? current.capabilities.websearch,
+    },
+    memoryEnabled: patch.memoryEnabled ?? current.memoryEnabled,
+    ownerId: patch.ownerId !== undefined ? patch.ownerId?.trim() || null : current.ownerId,
+  });
   if (patch.token !== undefined) setAgentToken(id, patch.token);
   if (patch.mcpServerIds) setAgentMcpServers(id, patch.mcpServerIds);
   if (patch.knowledgeIds) setAgentKnowledge(id, patch.knowledgeIds);
@@ -299,10 +445,13 @@ export function setAgentMcpServers(agentId: string, serverIds: string[]): void {
 }
 
 export function setAgentKnowledge(agentId: string, documentIds: string[]): void {
+  // Only shared documents (or this agent's own private ones) may be linked.
   const existing = new Set(
-    (db.prepare('SELECT id FROM knowledge_documents').all() as unknown as Array<{ id: string }>).map(
-      (row) => row.id,
-    ),
+    (
+      db
+        .prepare('SELECT id FROM knowledge_documents WHERE owner_agent_id IS NULL OR owner_agent_id = ?')
+        .all(agentId) as unknown as Array<{ id: string }>
+    ).map((row) => row.id),
   );
   const ids = [...new Set(documentIds)].filter((id) => existing.has(id));
   transaction(() => {

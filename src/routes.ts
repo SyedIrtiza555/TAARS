@@ -5,11 +5,22 @@ import multer from 'multer';
 import { Cron } from 'croner';
 import { z } from 'zod';
 import { bus } from './bus.js';
-import { agent } from './agent.js';
-import { checkPassword, clearLoginFailures, clearSessionCookie, issueSession, loginRateLimited, readSession, recordLoginFailure, requireAuth, sessionCookie, verifySession, originGuard } from './auth.js';
+import {
+  checkPassword,
+  clearLoginFailures,
+  clearSessionCookie,
+  issueSession,
+  loginRateLimited,
+  readSession,
+  recordLoginFailure,
+  requireAuth,
+  sessionCookie,
+  verifySession,
+  originGuard,
+} from './auth.js';
 import { config } from './config.js';
 import { extractFile } from './extract.js';
-import { hub } from './hub.js';
+import { hub, parseChatId, testChatId } from './hub.js';
 import {
   addSchedule,
   addSkill,
@@ -31,14 +42,14 @@ import {
 } from './hub-store.js';
 import { logger } from './logger.js';
 import { mcp } from './mcp.js';
+import { MEMORY_KINDS, memory } from './memory.js';
 import { opencode } from './opencode-runtime.js';
 import { getOpenRouterApiKey, listOpenRouterModels, testOpenRouterKey } from './openrouter.js';
 import { getSettings, updateSettings } from './settings.js';
 import { rag } from './rag.js';
 import { deleteSecret, setSecret } from './secrets.js';
-import { deleteChat, listAgentRuns, listChats, getMessages, resetChat } from './store.js';
+import { deleteChat, getMessages, listAgentRuns, listChats, resetChat } from './store.js';
 import { getAppStatus } from './status.js';
-import { whatsapp } from './whatsapp.js';
 
 class HttpError extends Error {
   status: number;
@@ -67,6 +78,10 @@ function extractClientIp(req: Request): string {
   return req.ip || req.socket?.remoteAddress || '0.0.0.0';
 }
 
+function param(req: Request, name: string): string {
+  return decodeURIComponent(String(req.params[name]));
+}
+
 function assertCron(expression: string): void {
   try {
     new Cron(expression, { paused: true }).stop();
@@ -91,6 +106,49 @@ const upload = multer({
   },
 });
 
+const profileText = (max = 5_000) => z.string().max(max).optional();
+
+const agentSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  model: z.string().trim().min(1).max(200).optional(),
+  systemPrompt: z.string().max(50_000).optional(),
+  token: z.string().max(2_000).optional().nullable(),
+  enabled: z.boolean().optional(),
+  autoStart: z.boolean().optional(),
+  typingIndicator: z.boolean().optional(),
+  readReceipts: z.boolean().optional(),
+  mcpServerIds: z.array(z.string()).optional(),
+  knowledgeIds: z.array(z.string()).optional(),
+  title: profileText(120),
+  roleDescription: profileText(),
+  personality: profileText(),
+  communicationStyle: profileText(),
+  objectives: profileText(),
+  operatingPrinciples: profileText(),
+  decisionStyle: profileText(),
+  avatar: z
+    .string()
+    .max(400_000)
+    .refine(
+      (value) => value === '' || /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(value),
+      'Avatar must be a PNG, JPEG, WebP or GIF image.',
+    )
+    .nullable()
+    .optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  capabilities: z.object({ webfetch: z.boolean().optional(), websearch: z.boolean().optional() }).optional(),
+  memoryEnabled: z.boolean().optional(),
+  ownerId: z.string().trim().max(120).nullable().optional(),
+});
+
+const memoryInputSchema = z.object({
+  content: z.string().trim().min(1).max(600),
+  kind: z.enum(MEMORY_KINDS).optional(),
+  importance: z.coerce.number().int().min(1).max(5).optional(),
+  conversationKey: z.string().max(200).optional(),
+  tier: z.enum(['long_term', 'working']).optional(),
+});
+
 export function createRouter() {
   const router = express.Router();
 
@@ -99,12 +157,10 @@ export function createRouter() {
   router.use(originGuard);
 
   /* ---------------- public auth ---------------- */
-  router.post('/auth/login', asyncRoute(async (req, res, next) => {
+  router.post('/auth/login', asyncRoute(async (req, res) => {
     if (!config.adminPassword) return nextHttpError(res, 503, 'ADMIN_PASSWORD is not configured on this server.');
     const ip = extractClientIp(req);
-    if (loginRateLimited(ip)) {
-      return nextHttpError(res, 429, 'Too many login attempts. Try again in 15 minutes.');
-    }
+    if (loginRateLimited(ip)) return nextHttpError(res, 429, 'Too many login attempts. Try again in 15 minutes.');
     const { password } = req.body as { password?: string };
     if (!password) return nextHttpError(res, 400, 'Password is required.');
     if (!checkPassword(password)) {
@@ -112,8 +168,7 @@ export function createRouter() {
       return nextHttpError(res, 401, 'Invalid password.');
     }
     clearLoginFailures(ip);
-    const token = issueSession();
-    res.setHeader('Set-Cookie', sessionCookie(token));
+    res.setHeader('Set-Cookie', sessionCookie(issueSession()));
     return respond(res, 200, { ok: true });
   }));
 
@@ -130,18 +185,16 @@ export function createRouter() {
   router.use(requireAuth);
 
   router.get('/health', asyncRoute(async (_req, res) => {
-    return respond(res, 200, { ok: true, version: '1.0.0', uptime: Math.floor(process.uptime()) });
+    return respond(res, 200, { ok: true, version: '2.0.0', uptime: Math.floor(process.uptime()) });
   }));
 
-  router.get('/status', asyncRoute(async (_req, res) => {
-    return respond(res, 200, getAppStatus());
-  }));
+  router.get('/status', asyncRoute(async (_req, res) => respond(res, 200, getAppStatus())));
 
+  /* settings (manager-level only) */
   router.get('/settings', asyncRoute(async (_req, res) => {
-    const current = getSettings();
     const key = getOpenRouterApiKey();
     return respond(res, 200, {
-      settings: current,
+      settings: getSettings(),
       openrouter: {
         configured: Boolean(key),
         source: key ? 'dashboard/env' : 'none',
@@ -153,36 +206,18 @@ export function createRouter() {
   router.put('/settings', asyncRoute(async (req, res) => {
     const patch = z
       .object({
-        botName: z.string().trim().min(1).max(60).optional(),
-        systemPrompt: z.string().max(20000).optional(),
         model: z.string().trim().min(1).max(200).optional(),
-        temperature: z.coerce.number().min(0).max(2).optional(),
-        maxTokens: z.coerce.number().int().min(128).max(8192).optional(),
-        maxHistory: z.coerce.number().int().min(2).max(100).optional(),
-        autoReply: z.boolean().optional(),
-        autoConnect: z.boolean().optional(),
-        groupMode: z.enum(['mention', 'all', 'off']).optional(),
-        allowedJids: z.array(z.string()).optional(),
-        blockedJids: z.array(z.string()).optional(),
-        ragEnabled: z.boolean().optional(),
-        ragAutoInject: z.boolean().optional(),
-        ragTopK: z.coerce.number().int().min(1).max(12).optional(),
-        ragMinScore: z.coerce.number().min(0).max(1).optional(),
-        typingIndicator: z.boolean().optional(),
-        readReceipts: z.boolean().optional(),
-        maxToolSteps: z.coerce.number().int().min(1).max(10).optional(),
-        toolTimeoutMs: z.coerce.number().int().min(5000).max(120000).optional(),
-        appendSignature: z.boolean().optional(),
-        signature: z.string().max(500).optional(),
-        fallbackMessage: z.string().max(1000).optional(),
-        maxCharsPerMessage: z.coerce.number().int().min(500).max(6000).optional(),
         timezone: z.string().max(100).optional(),
-        status: z.enum(['available', 'away']).optional(),
         provider: z.enum(['openrouter', 'groq']).optional(),
         groqApiKey: z.string().max(200).optional(),
+        memoryConsolidateEvery: z.coerce.number().int().min(1).max(50).optional(),
+        memoryMaxPerAgent: z.coerce.number().int().min(50).max(5000).optional(),
+        memoryWorkingTtlHours: z.coerce.number().int().min(1).max(720).optional(),
+        memoryRetrieveLimit: z.coerce.number().int().min(1).max(30).optional(),
       })
       .parse(req.body);
     const merged = updateSettings(patch);
+    if (patch.timezone !== undefined) await hub.refreshConfig();
     return respond(res, 200, { settings: merged });
   }));
 
@@ -196,57 +231,23 @@ export function createRouter() {
       return respond(res, 200, { ok: true, configured: false });
     }
     const test = await testOpenRouterKey(apiKey);
-    if (!test.ok) return respond(res, 400, { error: test.error || `Invalid ${settings.provider === 'groq' ? 'Groq' : 'OpenRouter'} key.` });
+    if (!test.ok) return respond(res, 400, { error: test.error || 'Invalid API key.' });
     setSecret(secretKey, apiKey);
     return respond(res, 200, { ok: true, configured: true, label: test.label });
   }));
 
   router.post('/settings/test-openrouter', asyncRoute(async (req, res) => {
-    const body = z.object({ apiKey: z.string().optional() }).parse(req.body);
+    const body = z.object({ apiKey: z.string().optional() }).parse(req.body ?? {});
     const result = await testOpenRouterKey(body.apiKey?.trim());
-    if (!result.ok) return respond(res, 400, result);
-    return respond(res, 200, result);
+    return respond(res, result.ok ? 200 : 400, result);
   }));
 
   router.get('/openrouter/models', asyncRoute(async (req, res) => {
-    const q = (req.query.q as string | undefined) || '';
-    const models = await listOpenRouterModels(q);
-    return respond(res, 200, {
-      models: models.map((m) => ({ id: m.id, name: m.name, context_length: m.context_length })),
-    });
+    const models = await listOpenRouterModels((req.query.q as string | undefined) || '');
+    return respond(res, 200, { models: models.map((m) => ({ id: m.id, name: m.name, context_length: m.context_length })) });
   }));
 
-  /* whatsapp */
-  router.get('/whatsapp/status', asyncRoute(async (_req, res) => {
-    return respond(res, 200, whatsapp.getSnapshot());
-  }));
-
-  router.post('/whatsapp/connect', asyncRoute(async (_req, res) => {
-    await whatsapp.start();
-    return respond(res, 200, { state: whatsapp.getSnapshot().state });
-  }));
-
-  router.post('/whatsapp/reconnect', asyncRoute(async (_req, res) => {
-    await whatsapp.reconnect();
-    return respond(res, 200, { state: whatsapp.getSnapshot().state });
-  }));
-
-  router.post('/whatsapp/disconnect', asyncRoute(async (_req, res) => {
-    await whatsapp.stop();
-    return respond(res, 200, { state: whatsapp.getSnapshot().state });
-  }));
-
-  router.post('/whatsapp/logout', asyncRoute(async (_req, res) => {
-    await whatsapp.logout();
-    return respond(res, 200, { state: whatsapp.getSnapshot().state });
-  }));
-
-  router.post('/whatsapp/send-test', asyncRoute(async (req, res) => {
-    const body = z.object({ text: z.string().min(1).max(1000) }).parse(req.body);
-    await whatsapp.sendToSelf(body.text);
-    return respond(res, 200, { ok: true });
-  }));
-
+  /* developer design annotations */
   router.get('/annotations', asyncRoute(async (_req, res) => {
     const annotationsPath = path.resolve(config.dataDir, 'annotations.json');
     try {
@@ -267,58 +268,53 @@ export function createRouter() {
     return respond(res, 200, updated);
   }));
 
-  /* conversations */
+  /* conversations: read-only transcripts of what each agent handled */
   router.get('/conversations', asyncRoute(async (req, res) => {
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit || 50)));
-    const chats = listChats(limit);
-    return respond(res, 200, chats);
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
+    const agentId = typeof req.query.agentId === 'string' ? req.query.agentId : '';
+    const chats = listChats(agentId ? 500 : limit).filter((chat) => {
+      const parsed = parseChatId(chat.chat_id);
+      return agentId ? parsed?.agentId === agentId : true;
+    });
+    return respond(
+      res,
+      200,
+      chats.slice(0, limit).map((chat) => ({ ...chat, agent_id: parseChatId(chat.chat_id)?.agentId ?? null })),
+    );
   }));
 
   router.get('/conversations/:chatId/messages', asyncRoute(async (req, res) => {
     const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
-    const chatId = decodeURIComponent(String(req.params.chatId));
-    const messages = getMessages(chatId, limit);
-    return respond(res, 200, messages);
+    return respond(res, 200, getMessages(param(req, 'chatId'), limit));
   }));
 
   router.delete('/conversations/:chatId', asyncRoute(async (req, res) => {
-    const chatId = decodeURIComponent(String(req.params.chatId));
+    const chatId = param(req, 'chatId');
+    const parsed = parseChatId(chatId);
+    if (parsed) hub.resetConversation(parsed.agentId, parsed.conversationKey);
     deleteChat(chatId);
     return respond(res, 200, { ok: true });
   }));
 
   router.post('/conversations/:chatId/reset', asyncRoute(async (req, res) => {
-    const chatId = decodeURIComponent(String(req.params.chatId));
+    const chatId = param(req, 'chatId');
+    const parsed = parseChatId(chatId);
+    if (parsed) hub.resetConversation(parsed.agentId, parsed.conversationKey);
     resetChat(chatId);
     return respond(res, 200, { ok: true });
   }));
 
-  router.post('/conversations/:chatId/send', asyncRoute(async (req, res) => {
-    const chatId = decodeURIComponent(String(req.params.chatId));
-    const body = z.object({ text: z.string().min(1).max(4000), senderName: z.string().optional() }).parse(req.body);
-    const result = await agent.respond({ chatId, userText: body.text, senderName: body.senderName || 'Admin', source: 'web' });
-    return respond(res, 200, result);
-  }));
-
-  /* playground */
-  router.post('/playground', asyncRoute(async (req, res) => {
-    const body = z.object({ message: z.string().min(1).max(4000), reset: z.boolean().optional() }).parse(req.body);
-    const chatId = 'web:playground';
-    if (body.reset) resetChat(chatId);
-    const result = await agent.respond({ chatId, userText: body.message, source: 'web' });
-    return respond(res, 200, result);
-  }));
-
-  /* knowledge */
+  /* shared knowledge library */
   router.get('/knowledge', asyncRoute(async (_req, res) => {
-    const docs = rag.listDocuments();
-    const stats = rag.getStats();
-    const embeddings = rag.getEmbeddingStatus();
-    return respond(res, 200, { documents: docs, stats, embeddings });
+    return respond(res, 200, {
+      documents: rag.listDocuments(),
+      stats: rag.getStats(),
+      embeddings: rag.getEmbeddingStatus(),
+    });
   }));
 
-  router.get('/knowledge/:id', asyncRoute(async (req, res, next) => {
-    const doc = rag.getDocument(decodeURIComponent(String(req.params.id)));
+  router.get('/knowledge/:id', asyncRoute(async (req, res) => {
+    const doc = rag.getDocument(param(req, 'id'));
     if (!doc) return nextHttpError(res, 404, 'Document not found');
     return respond(res, 200, { document: doc });
   }));
@@ -332,12 +328,18 @@ export function createRouter() {
   router.post('/knowledge/upload', upload.single('file'), asyncRoute(async (req, res) => {
     if (!req.file) return nextHttpError(res, 400, 'No file uploaded.');
     const extracted = await extractFile(req.file.originalname, req.file.buffer);
-    const doc = await rag.addDocumentAndWait({ title: extracted.title, content: extracted.text, sourceType: 'file', sourceName: req.file.originalname, mimeType: extracted.mimeType });
+    const doc = await rag.addDocumentAndWait({
+      title: extracted.title,
+      content: extracted.text,
+      sourceType: 'file',
+      sourceName: req.file.originalname,
+      mimeType: extracted.mimeType,
+    });
     return respond(res, 201, { document: doc, preview: extracted.text.slice(0, 1000) });
   }));
 
   router.post('/knowledge/:id/reindex', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     const doc = rag.getDocument(id);
     if (!doc) return nextHttpError(res, 404, 'Document not found');
     void rag.indexDocument(id);
@@ -345,15 +347,16 @@ export function createRouter() {
   }));
 
   router.delete('/knowledge/:id', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
-    const ok = rag.deleteDocument(id);
-    if (!ok) return nextHttpError(res, 404, 'Document not found');
+    if (!rag.deleteDocument(param(req, 'id'))) return nextHttpError(res, 404, 'Document not found');
     return respond(res, 200, { ok: true });
   }));
 
   router.post('/knowledge/search', asyncRoute(async (req, res) => {
-    const body = z.object({ query: z.string().min(1), k: z.coerce.number().int().min(1).max(20).default(5) }).parse(req.body);
-    const results = await rag.search(body.query, body.k, 0.05);
+    const body = z
+      .object({ query: z.string().min(1), k: z.coerce.number().int().min(1).max(20).default(5), agentId: z.string().optional() })
+      .parse(req.body);
+    const scope = body.agentId ? { documentIds: requireHubAgent(body.agentId).knowledgeIds } : {};
+    const results = await rag.search(body.query, body.k, 0.05, scope);
     return respond(res, 200, {
       results: results.map(({ chunkId, documentId, title, content, score, lexicalScore, vectorScore }) => ({
         chunkId, documentId, title, content: content.slice(0, 1200), score, lexicalScore, vectorScore,
@@ -363,9 +366,8 @@ export function createRouter() {
 
   /* mcp */
   router.get('/mcp', asyncRoute(async (_req, res) => {
-    const servers = mcp.listServers();
     return respond(res, 200, {
-      servers: servers.map((s) => {
+      servers: mcp.listServers().map((s) => {
         const tools = mcp.getCachedTools(s.id);
         return {
           id: s.id,
@@ -389,119 +391,82 @@ export function createRouter() {
     });
   }));
 
+  const mcpBody = {
+    name: z.string().min(1).max(100),
+    transport: z.enum(['stdio', 'sse', 'http']),
+    command: z.string().optional(),
+    args: z.string().optional(),
+    env: z.string().optional(),
+    cwd: z.string().optional(),
+    url: z.string().optional(),
+    headers: z.string().optional(),
+  };
+
   router.post('/mcp', asyncRoute(async (req, res) => {
-    const body = z.object({
-      name: z.string().min(1).max(100),
-      transport: z.enum(['stdio', 'sse', 'http']),
-      command: z.string().optional(),
-      args: z.string().optional(),
-      env: z.string().optional(),
-      cwd: z.string().optional(),
-      url: z.string().optional(),
-      headers: z.string().optional(),
-      enabled: z.boolean().default(true),
-      disabledTools: z.array(z.string()).default([]),
-    }).parse(req.body);
+    const body = z
+      .object({ ...mcpBody, enabled: z.boolean().default(true), disabledTools: z.array(z.string()).default([]) })
+      .parse(req.body);
     const server = mcp.createServer(body);
     await hub.refreshConfig();
     return respond(res, 201, server);
   }));
 
   router.put('/mcp/:id', asyncRoute(async (req, res) => {
-    const body = z.object({
-      name: z.string().min(1).max(100).optional(),
-      transport: z.enum(['stdio', 'sse', 'http']).optional(),
-      command: z.string().optional(),
-      args: z.string().optional(),
-      env: z.string().optional(),
-      cwd: z.string().optional(),
-      url: z.string().optional(),
-      headers: z.string().optional(),
-      enabled: z.boolean().optional(),
-      disabledTools: z.array(z.string()).optional(),
-    }).parse(req.body);
-    const server = mcp.updateServer(decodeURIComponent(String(req.params.id)), body);
+    const body = z
+      .object({ ...mcpBody, enabled: z.boolean(), disabledTools: z.array(z.string()) })
+      .partial()
+      .parse(req.body);
+    const server = mcp.updateServer(param(req, 'id'), body);
     await hub.refreshConfig();
     return respond(res, 200, server);
   }));
 
   router.delete('/mcp/:id', asyncRoute(async (req, res) => {
-    const ok = mcp.deleteServer(decodeURIComponent(String(req.params.id)));
-    if (!ok) return nextHttpError(res, 404, 'Server not found');
+    if (!mcp.deleteServer(param(req, 'id'))) return nextHttpError(res, 404, 'Server not found');
     await hub.refreshConfig();
     return respond(res, 200, { ok: true });
   }));
 
   router.patch('/mcp/:id/toggle', asyncRoute(async (req, res) => {
     const body = z.object({ enabled: z.boolean() }).parse(req.body);
-    const server = mcp.updateServer(decodeURIComponent(String(req.params.id)), { enabled: body.enabled });
+    const server = mcp.updateServer(param(req, 'id'), { enabled: body.enabled });
     await hub.refreshConfig();
     return respond(res, 200, server);
   }));
 
-  router.post('/mcp/:id/test', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
-    const result = await mcp.testServer(id);
-    return respond(res, 200, result);
-  }));
+  router.post('/mcp/:id/test', asyncRoute(async (req, res) => respond(res, 200, await mcp.testServer(param(req, 'id')))));
 
   router.post('/mcp/reload', asyncRoute(async (_req, res) => {
     await mcp.closeAll();
     const { tools, errors } = await mcp.getAllTools();
-    return respond(res, 200, {
-      tools: tools.map(({ function: fn }) => ({ name: fn.name, description: fn.description })),
-      errors,
-    });
+    return respond(res, 200, { tools: tools.map(({ function: fn }) => ({ name: fn.name, description: fn.description })), errors });
   }));
 
   router.get('/mcp/tools', asyncRoute(async (_req, res) => {
     const { tools, errors } = await mcp.getAllTools();
-    return respond(res, 200, {
-      tools: tools.map(({ function: fn }) => ({ name: fn.name, description: fn.description })),
-      errors,
-    });
+    return respond(res, 200, { tools: tools.map(({ function: fn }) => ({ name: fn.name, description: fn.description })), errors });
   }));
 
   router.patch('/mcp/:id/tools', asyncRoute(async (req, res) => {
     const body = z.object({ disabledTools: z.array(z.string()) }).parse(req.body);
-    const server = mcp.updateServer(decodeURIComponent(String(req.params.id)), { disabledTools: body.disabledTools });
-    return respond(res, 200, server);
+    return respond(res, 200, mcp.updateServer(param(req, 'id'), { disabledTools: body.disabledTools }));
   }));
 
-  /* ---------------- local hub: official WhatsApp + OpenCode ---------------- */
+  /* ---------------- agents ---------------- */
 
-  router.get('/hub/status', asyncRoute(async (_req, res) => {
-    return respond(res, 200, hub.getStatus());
-  }));
+  router.get('/hub/status', asyncRoute(async (_req, res) => respond(res, 200, hub.getStatus())));
 
   router.get('/hub/agents', asyncRoute(async (_req, res) => {
-    return respond(res, 200, {
-      agents: listAgents().map((item) => hub.getAgentSnapshot(item)),
-    });
+    return respond(res, 200, { agents: listAgents().map((item) => hub.getAgentSnapshot(item)) });
   }));
 
   router.post('/hub/agents', asyncRoute(async (req, res) => {
-    const body = z
-      .object({
-        name: z.string().trim().min(1).max(80),
-        model: z.string().trim().min(1).max(200).optional(),
-        systemPrompt: z.string().max(50_000).optional(),
-        token: z.string().max(2_000).optional().nullable(),
-        enabled: z.boolean().optional(),
-        autoStart: z.boolean().optional(),
-        typingIndicator: z.boolean().optional(),
-        readReceipts: z.boolean().optional(),
-        mcpServerIds: z.array(z.string()).optional(),
-        knowledgeIds: z.array(z.string()).optional(),
-      })
-      .parse(req.body);
-    const serverIds =
-      body.mcpServerIds ??
-      mcp.listServers().filter((server) => server.enabled).map((server) => server.id);
+    const body = agentSchema.parse(req.body);
     const created = createAgent({
       ...body,
       token: body.token || null,
-      mcpServerIds: serverIds,
+      // New agents get no tools until the manager grants them explicitly.
+      mcpServerIds: body.mcpServerIds ?? [],
       knowledgeIds: body.knowledgeIds ?? [],
     });
     await hub.applyAgentChange(created.id);
@@ -509,102 +474,98 @@ export function createRouter() {
   }));
 
   router.get('/hub/agents/:id', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
-    const detail = getAgentDetail(id);
+    const detail = getAgentDetail(param(req, 'id'));
     if (!detail) throw new HttpError(404, 'Agent not found.');
     return respond(res, 200, { agent: detail });
   }));
 
   router.put('/hub/agents/:id', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
-    const body = z
-      .object({
-        name: z.string().trim().min(1).max(80).optional(),
-        model: z.string().trim().min(1).max(200).optional(),
-        systemPrompt: z.string().max(50_000).optional(),
-        token: z.string().max(2_000).optional().nullable(),
-        enabled: z.boolean().optional(),
-        autoStart: z.boolean().optional(),
-        typingIndicator: z.boolean().optional(),
-        readReceipts: z.boolean().optional(),
-        mcpServerIds: z.array(z.string()).optional(),
-        knowledgeIds: z.array(z.string()).optional(),
-      })
-      .parse(req.body);
-    const updated = updateAgent(id, body);
-    if (!updated) throw new HttpError(404, 'Agent not found.');
+    const body = agentSchema.partial().parse(req.body);
+    if (!updateAgent(id, body)) throw new HttpError(404, 'Agent not found.');
     await hub.applyAgentChange(id);
     return respond(res, 200, { agent: getAgentDetail(id) });
   }));
 
   router.delete('/hub/agents/:id', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     await hub.stopAgent(id);
-    const ok = deleteAgent(id);
-    if (!ok) throw new HttpError(404, 'Agent not found.');
-    opencode.invalidateConfig();
+    for (const documentId of rag.listOwnedDocumentIds(id)) rag.deleteDocument(documentId);
+    if (!deleteAgent(id)) throw new HttpError(404, 'Agent not found.');
+    resetChat(testChatId(id));
+    opencode.removeAgentWorkspace(id);
     void hub.refreshConfig();
     return respond(res, 200, { ok: true });
   }));
 
   router.post('/hub/agents/:id/start', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     const found = requireHubAgent(id);
     if (!found.hasToken) throw new HttpError(400, 'Add a WhatsApp Agent Platform token first.');
     try {
-      const result = await hub.startAgent(id);
-      return respond(res, 200, { agent: result });
+      return respond(res, 200, { agent: await hub.startAgent(id) });
     } catch (error) {
       return nextHttpError(res, 400, error instanceof Error ? error.message : 'Could not start agent.');
     }
   }));
 
   router.post('/hub/agents/:id/stop', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     await hub.stopAgent(id);
     return respond(res, 200, { ok: true });
   }));
 
   router.post('/hub/agents/:id/restart', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     try {
-      const result = await hub.restartAgent(id);
-      return respond(res, 200, { agent: result });
+      return respond(res, 200, { agent: await hub.restartAgent(id) });
     } catch (error) {
       return nextHttpError(res, 400, error instanceof Error ? error.message : 'Could not restart agent.');
     }
   }));
 
+  /* dashboard conversation with an agent (never sent to WhatsApp) */
   router.post('/hub/agents/:id/test', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     const body = z.object({ text: z.string().trim().min(1).max(20_000) }).parse(req.body);
     try {
-      const result = await hub.testAgent(id, body.text);
-      return respond(res, 200, result);
+      return respond(res, 200, await hub.testAgent(id, body.text));
     } catch (error) {
       return nextHttpError(res, 400, error instanceof Error ? error.message : 'Agent test failed.');
     }
   }));
 
+  router.get('/hub/agents/:id/test/messages', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    return respond(res, 200, { messages: getMessages(testChatId(id), 200) });
+  }));
+
+  router.post('/hub/agents/:id/test/reset', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    hub.resetTest(id);
+    return respond(res, 200, { ok: true });
+  }));
+
   router.post('/hub/agents/:id/send', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     const body = z.object({ text: z.string().trim().min(1).max(4_000) }).parse(req.body);
     try {
-      const ids = await hub.sendToCreator(id, body.text);
-      return respond(res, 200, { ok: true, messageIds: ids });
+      return respond(res, 200, { ok: true, messageIds: await hub.sendToCreator(id, body.text) });
     } catch (error) {
       return nextHttpError(res, 400, error instanceof Error ? error.message : 'Could not send message.');
     }
   }));
 
   router.put('/hub/agents/:id/mcp', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     const body = z.object({ serverIds: z.array(z.string()) }).parse(req.body);
     setAgentMcpServers(id, body.serverIds);
@@ -612,23 +573,116 @@ export function createRouter() {
     return respond(res, 200, { agent: getAgentDetail(id) });
   }));
 
+  /* per-agent knowledge */
   router.put('/hub/agents/:id/knowledge', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     const body = z.object({ documentIds: z.array(z.string()) }).parse(req.body);
     setAgentKnowledge(id, body.documentIds);
     return respond(res, 200, { agent: getAgentDetail(id) });
   }));
 
+  router.post('/hub/agents/:id/knowledge/upload', upload.single('file'), asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    if (!req.file) return nextHttpError(res, 400, 'No supported file uploaded.');
+    const extracted = await extractFile(req.file.originalname, req.file.buffer);
+    const doc = await rag.addDocumentAndWait({
+      title: extracted.title,
+      content: extracted.text,
+      sourceType: 'file',
+      sourceName: req.file.originalname,
+      mimeType: extracted.mimeType,
+      ownerAgentId: id,
+    });
+    return respond(res, 201, { document: doc });
+  }));
+
+  router.post('/hub/agents/:id/knowledge/text', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    const body = z.object({ title: z.string().trim().min(1).max(200), text: z.string().min(1).max(5_000_000) }).parse(req.body);
+    const doc = await rag.addDocumentAndWait({
+      title: body.title,
+      content: body.text,
+      sourceType: 'text',
+      sourceName: 'Dashboard',
+      ownerAgentId: id,
+    });
+    return respond(res, 201, { document: doc });
+  }));
+
+  /* per-agent memory (every call is scoped by agent id) */
+  router.get('/hub/agents/:id/memory', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    const conversationKey = typeof req.query.conversation === 'string' ? req.query.conversation : undefined;
+    const tier = req.query.tier === 'working' || req.query.tier === 'long_term' ? req.query.tier : undefined;
+    const query = typeof req.query.q === 'string' ? req.query.q : undefined;
+    return respond(res, 200, {
+      memories: memory.list(id, { conversationKey, tier, query }),
+      conversations: memory.listStates(id),
+      stats: memory.stats(id),
+    });
+  }));
+
+  router.post('/hub/agents/:id/memory', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    const body = memoryInputSchema.parse(req.body);
+    return respond(res, 201, { memory: memory.add(id, { ...body, source: 'manual' }) });
+  }));
+
+  router.put('/hub/agents/:id/memory/:memoryId', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    const body = memoryInputSchema.partial().parse(req.body);
+    const updated = memory.update(id, param(req, 'memoryId'), body);
+    if (!updated) throw new HttpError(404, 'Memory not found.');
+    return respond(res, 200, { memory: updated });
+  }));
+
+  router.delete('/hub/agents/:id/memory/:memoryId', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    if (!memory.delete(id, param(req, 'memoryId'))) throw new HttpError(404, 'Memory not found.');
+    return respond(res, 200, { ok: true });
+  }));
+
+  router.post('/hub/agents/:id/memory/clear', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    const body = z.object({ conversationKey: z.string().max(200).optional() }).parse(req.body ?? {});
+    return respond(res, 200, { removed: memory.clear(id, body.conversationKey) });
+  }));
+
+  router.post('/hub/agents/:id/memory/consolidate', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    const body = z.object({ conversationKey: z.string().max(200).default('test') }).parse(req.body ?? {});
+    try {
+      return respond(res, 200, { result: await hub.consolidateNow(id, body.conversationKey) });
+    } catch (error) {
+      return nextHttpError(res, 400, error instanceof Error ? error.message : 'Consolidation failed.');
+    }
+  }));
+
+  router.post('/hub/agents/:id/memory/search', asyncRoute(async (req, res) => {
+    const id = param(req, 'id');
+    requireHubAgent(id);
+    const body = z.object({ query: z.string().trim().min(1).max(2_000), conversationKey: z.string().max(200).default('test') }).parse(req.body);
+    return respond(res, 200, await memory.retrieve(id, body.conversationKey, body.query));
+  }));
+
+  /* skills */
   router.get('/hub/agents/:id/skills', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
-    const detail = getAgentDetail(id);
+    const detail = getAgentDetail(param(req, 'id'));
     if (!detail) throw new HttpError(404, 'Agent not found.');
     return respond(res, 200, { skills: detail.skills });
   }));
 
   router.post('/hub/agents/:id/skills', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     const body = z
       .object({
@@ -644,7 +698,7 @@ export function createRouter() {
   }));
 
   router.put('/hub/skills/:id', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     const current = getSkill(id);
     if (!current) throw new HttpError(404, 'Skill not found.');
     const body = z
@@ -661,7 +715,7 @@ export function createRouter() {
   }));
 
   router.delete('/hub/skills/:id', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     const current = getSkill(id);
     if (!current) throw new HttpError(404, 'Skill not found.');
     deleteSkill(id);
@@ -669,19 +723,17 @@ export function createRouter() {
     return respond(res, 200, { ok: true });
   }));
 
-  router.get('/hub/schedules', asyncRoute(async (_req, res) => {
-    return respond(res, 200, { schedules: listAllSchedules() });
-  }));
+  /* schedules */
+  router.get('/hub/schedules', asyncRoute(async (_req, res) => respond(res, 200, { schedules: listAllSchedules() })));
 
   router.get('/hub/agents/:id/schedules', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
-    const detail = getAgentDetail(id);
+    const detail = getAgentDetail(param(req, 'id'));
     if (!detail) throw new HttpError(404, 'Agent not found.');
     return respond(res, 200, { schedules: detail.schedules });
   }));
 
   router.post('/hub/agents/:id/schedules', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     requireHubAgent(id);
     const body = z
       .object({
@@ -698,9 +750,8 @@ export function createRouter() {
   }));
 
   router.put('/hub/schedules/:id', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
-    const current = getSchedule(id);
-    if (!current) throw new HttpError(404, 'Schedule not found.');
+    const id = param(req, 'id');
+    if (!getSchedule(id)) throw new HttpError(404, 'Schedule not found.');
     const body = z
       .object({
         name: z.string().trim().min(1).max(100).optional(),
@@ -716,7 +767,7 @@ export function createRouter() {
   }));
 
   router.delete('/hub/schedules/:id', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     if (!getSchedule(id)) throw new HttpError(404, 'Schedule not found.');
     deleteSchedule(id);
     await hub.refreshConfig();
@@ -724,15 +775,15 @@ export function createRouter() {
   }));
 
   router.post('/hub/schedules/:id/run', asyncRoute(async (req, res) => {
-    const id = decodeURIComponent(String(req.params.id));
+    const id = param(req, 'id');
     if (!getSchedule(id)) throw new HttpError(404, 'Schedule not found.');
     void hub.runSchedule(id);
     return respond(res, 202, { ok: true });
   }));
 
   router.post('/hub/runtime/reload', asyncRoute(async (_req, res) => {
-    await hub.refreshConfig();
     try {
+      await opencode.ensure();
       await opencode.syncConfig(true);
     } catch (error) {
       return nextHttpError(res, 400, error instanceof Error ? error.message : 'Could not reload OpenCode.');
@@ -751,48 +802,43 @@ export function createRouter() {
     return respond(res, 200, { runs: listAgentRuns(limit) });
   }));
 
-  router.post('/agent/reset-playground', asyncRoute(async (_req, res) => {
-    resetChat('web:playground');
-    return respond(res, 200, { ok: true });
-  }));
-
   /* SSE events */
   router.get('/events', asyncRoute(async (req, res) => {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
     res.flushHeaders?.();
     const send = (event: string, data: unknown) => {
-      try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch { /* ignore */ }
+      try {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      } catch {
+        /* ignore */
+      }
     };
     send('retry', { retry: 3000 });
     send('hello', { at: new Date().toISOString() });
     const handler = (message: { type: string; data: unknown }) => send(message.type, message.data);
     bus.on('event', handler);
-    req.on('close', () => { bus.off('event', handler); clearInterval(timer); });
-    req.on('error', () => { bus.off('event', handler); clearInterval(timer); });
     const timer = setInterval(() => send('heartbeat', { at: new Date().toISOString() }), 20_000);
+    const cleanup = () => {
+      bus.off('event', handler);
+      clearInterval(timer);
+    };
+    req.on('close', cleanup);
+    req.on('error', cleanup);
   }));
 
   router.use((_req, res) => respond(res, 404, { error: 'Unknown API endpoint' }));
 
   router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    if (err instanceof HttpError) {
-      return respond(res, err.status, { error: err.message });
-    }
+    if (err instanceof HttpError) return respond(res, err.status, { error: err.message });
     if (err instanceof z.ZodError) {
-      const issues = err.issues.slice(0, 10).map((i) => ({
-        path: i.path.join('.'),
-        message: i.message,
-      }));
+      const issues = err.issues.slice(0, 10).map((i) => ({ path: i.path.join('.'), message: i.message }));
       const first = issues[0];
-      return respond(res, 400, {
-        error: first ? `${first.path || 'request'}: ${first.message}` : 'Validation error',
-        issues,
-      });
+      return respond(res, 400, { error: first ? `${first.path || 'request'}: ${first.message}` : 'Validation error', issues });
     }
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ error: message }, 'Unhandled API error');
@@ -801,4 +847,3 @@ export function createRouter() {
 
   return router;
 }
-

@@ -17,9 +17,11 @@ export const config = {
   port: intEnv('PORT', 8787),
   host: process.env.HOST || '127.0.0.1',
   dataDir,
-  authDir: path.join(dataDir, 'wa-auth'),
   modelsDir: path.join(dataDir, 'models'),
+  /** Legacy shared uploads folder. New media goes into each agent's own workspace inbox. */
   uploadsDir: path.join(dataDir, 'uploads'),
+  /** One isolated workspace per agent: data/agents/<agent>/workspace */
+  agentsDir: path.join(dataDir, 'agents'),
   publicDir: path.join(rootDir, 'public', 'admin'),
   adminPassword: process.env.ADMIN_PASSWORD || '',
   appSecret: process.env.APP_SECRET || '',
@@ -32,9 +34,11 @@ export const config = {
   logLevel: process.env.LOG_LEVEL || 'info',
   isProduction: process.env.NODE_ENV === 'production',
   appUrl: process.env.APP_URL || `http://${process.env.HOST || '127.0.0.1'}:${intEnv('PORT', 8787)}`,
+  /** Set HUB_AUTOSTART=0 to boot without starting any WhatsApp pollers (useful for testing a copy). */
+  hubAutoStart: process.env.HUB_AUTOSTART !== '0',
 };
 
-for (const dir of [config.dataDir, config.authDir, config.modelsDir, config.uploadsDir]) {
+for (const dir of [config.dataDir, config.modelsDir, config.agentsDir]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 

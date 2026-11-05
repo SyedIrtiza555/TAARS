@@ -23,6 +23,7 @@ export type KnowledgeDocument = {
   error: string | null;
   char_count: number;
   chunk_count: number;
+  owner_agent_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -134,16 +135,16 @@ export function chunkText(text: string, options: ChunkOptions = {}): string[] {
   return chunks.filter(Boolean);
 }
 
-function encodeEmbedding(vector: number[]): Uint8Array {
+export function encodeEmbedding(vector: number[]): Uint8Array {
   return new Uint8Array(new Float32Array(vector).buffer);
 }
 
-function decodeEmbedding(buffer: Uint8Array): Float32Array {
+export function decodeEmbedding(buffer: Uint8Array): Float32Array {
   const copy = new Uint8Array(buffer);
   return new Float32Array(copy.buffer, copy.byteOffset, copy.byteLength / 4);
 }
 
-function cosine(a: Float32Array, b: Float32Array): number {
+export function cosine(a: Float32Array, b: Float32Array): number {
   if (a.length !== b.length) return 0;
   let dot = 0;
   for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
@@ -225,21 +226,32 @@ export class RagService {
     }
   }
 
+  /** Public embedding helper used by the per-agent memory system. Returns null when embeddings are unavailable. */
+  async embed(texts: string[]): Promise<number[][] | null> {
+    return this.embedTexts(texts);
+  }
+
   listDocuments(): KnowledgeDocument[] {
     return db
       .prepare(
         `SELECT id, title, source_type, source_name, mime_type, status, error, char_count, chunk_count,
-                created_at, updated_at
+                owner_agent_id, created_at, updated_at
          FROM knowledge_documents ORDER BY created_at DESC`,
       )
       .all() as unknown as KnowledgeDocument[];
+  }
+
+  listOwnedDocumentIds(agentId: string): string[] {
+    return (db.prepare('SELECT id FROM knowledge_documents WHERE owner_agent_id = ?').all(agentId) as Array<{ id: string }>).map(
+      (row) => row.id,
+    );
   }
 
   getDocument(id: string): KnowledgeDocument | null {
     return (db
       .prepare(
         `SELECT id, title, source_type, source_name, mime_type, status, error, char_count, chunk_count,
-                created_at, updated_at
+                owner_agent_id, created_at, updated_at
          FROM knowledge_documents WHERE id = ?`,
       )
       .get(id) as unknown as KnowledgeDocument) || null;
@@ -251,6 +263,7 @@ export class RagService {
     sourceType?: string;
     sourceName?: string;
     mimeType?: string;
+    ownerAgentId?: string | null;
   }): KnowledgeDocument {
     const content = input.content.replace(/\u0000/g, '').trim();
     if (!content) throw new Error('Document content is empty.');
@@ -260,8 +273,8 @@ export class RagService {
     const title = input.title.trim().slice(0, 200) || 'Untitled document';
     db.prepare(
       `INSERT INTO knowledge_documents
-       (id, title, source_type, source_name, mime_type, content, status, char_count, chunk_count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'indexing', ?, 0, ?, ?)`,
+       (id, title, source_type, source_name, mime_type, content, status, char_count, chunk_count, owner_agent_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'indexing', ?, 0, ?, ?, ?)`,
     ).run(
       id,
       title,
@@ -270,6 +283,7 @@ export class RagService {
       input.mimeType || null,
       content,
       content.length,
+      input.ownerAgentId || null,
       at,
       at,
     );
@@ -284,6 +298,7 @@ export class RagService {
     sourceType?: string;
     sourceName?: string;
     mimeType?: string;
+    ownerAgentId?: string | null;
   }): Promise<KnowledgeDocument> {
     const doc = this.addDocument(input);
     await this.waitForDocument(doc.id);
@@ -402,10 +417,22 @@ export class RagService {
     return this.cachedChunks;
   }
 
-  async search(query: string, topK = 5, minScore = 0.18): Promise<SearchResult[]> {
+  /**
+   * Hybrid BM25 + vector search. When `documentIds` is given, ranking happens only inside
+   * that set, so an agent's search can never surface (or be crowded out by) other documents.
+   */
+  async search(
+    query: string,
+    topK = 5,
+    minScore = 0.18,
+    options: { documentIds?: string[] } = {},
+  ): Promise<SearchResult[]> {
     const cleanQuery = query.trim();
     if (!cleanQuery) return [];
-    const chunks = this.loadChunks();
+    const allChunks = this.loadChunks();
+    const allowed = options.documentIds ? new Set(options.documentIds) : null;
+    if (allowed && allowed.size === 0) return [];
+    const chunks = allowed ? allChunks.filter((chunk) => allowed.has(chunk.document_id)) : allChunks;
     if (chunks.length === 0) return [];
 
     const queryTokens = tokenize(cleanQuery);

@@ -220,6 +220,69 @@ if (!hubSessionColumns.some((column) => column.name === 'conversation_key')) {
   `);
 }
 
+/* ---------------- Agent manager: profiles, memory, private knowledge ---------------- */
+
+function addColumn(table: string, column: string, ddl: string): void {
+  const columns = db.prepare(`PRAGMA table_info('${table}')`).all() as Array<{ name: string }>;
+  if (!columns.some((item) => item.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+  }
+}
+
+for (const column of [
+  'title',
+  'role_description',
+  'personality',
+  'communication_style',
+  'objectives',
+  'operating_principles',
+  'decision_style',
+]) {
+  addColumn('hub_agents', column, "TEXT NOT NULL DEFAULT ''");
+}
+addColumn('hub_agents', 'avatar', 'TEXT');
+addColumn('hub_agents', 'color', "TEXT NOT NULL DEFAULT '#22c55e'");
+addColumn('hub_agents', 'capabilities', "TEXT NOT NULL DEFAULT '{}'");
+addColumn('hub_agents', 'memory_enabled', 'INTEGER NOT NULL DEFAULT 1');
+addColumn('hub_agents', 'owner_id', 'TEXT');
+// Documents with an owner are private to that agent; NULL means the shared library.
+addColumn('knowledge_documents', 'owner_agent_id', 'TEXT');
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_documents_owner ON knowledge_documents(owner_agent_id);
+
+  CREATE TABLE IF NOT EXISTS agent_memories (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL REFERENCES hub_agents(id) ON DELETE CASCADE,
+    conversation_key TEXT NOT NULL DEFAULT '',
+    tier TEXT NOT NULL DEFAULT 'long_term',
+    kind TEXT NOT NULL DEFAULT 'fact',
+    content TEXT NOT NULL,
+    importance INTEGER NOT NULL DEFAULT 3,
+    source TEXT NOT NULL DEFAULT 'auto',
+    embedding BLOB,
+    access_count INTEGER NOT NULL DEFAULT 0,
+    last_accessed_at TEXT,
+    expires_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_agent_memories_scope ON agent_memories(agent_id, conversation_key, tier);
+
+  CREATE TABLE IF NOT EXISTS agent_conversation_state (
+    agent_id TEXT NOT NULL REFERENCES hub_agents(id) ON DELETE CASCADE,
+    conversation_key TEXT NOT NULL,
+    summary TEXT NOT NULL DEFAULT '',
+    turns INTEGER NOT NULL DEFAULT 0,
+    pending_turns INTEGER NOT NULL DEFAULT 0,
+    last_consolidated_at TEXT,
+    last_error TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (agent_id, conversation_key)
+  );
+`);
+
 export function transaction<T>(fn: () => T): T {
   db.exec('BEGIN');
   try {

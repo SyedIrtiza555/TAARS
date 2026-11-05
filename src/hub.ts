@@ -12,6 +12,7 @@ import {
   getAgentToken,
   getAutoStartAgents,
   getSchedule,
+  getSession,
   listAgents,
   listAllSchedules,
   listSchedules,
@@ -21,12 +22,12 @@ import {
   setAgentOffset,
   setAgentStatus,
   type HubAgent,
-  type HubSchedule,
 } from './hub-store.js';
-import { opencode } from './opencode-runtime.js';
+import { memory } from './memory.js';
+import { agentInbox, opencode } from './opencode-runtime.js';
 import { rag } from './rag.js';
 import { getSettings } from './settings.js';
-import { ensureChat, recordAgentRun, saveMessage } from './store.js';
+import { ensureChat, recordAgentRun, resetChat, saveMessage } from './store.js';
 import { errorMessage } from './util.js';
 import {
   WhatsAppAgentClient,
@@ -50,6 +51,23 @@ type HubAgentSnapshot = ReturnType<typeof listAgents>[number] & {
   runtimeStartedAt: string | null;
   nextRun: string | null;
 };
+
+export function testChatId(agentId: string): string {
+  return `hub-test:${agentId}`;
+}
+
+export function peerChatId(agentId: string, peer: string): string {
+  return `wa-hub:${agentId}:${peer}`;
+}
+
+/** Maps a stored chat id back to its agent and conversation key. */
+export function parseChatId(chatId: string): { agentId: string; conversationKey: string } | null {
+  const peer = /^wa-hub:([^:]+):(.+)$/.exec(chatId);
+  if (peer) return { agentId: peer[1], conversationKey: peer[2] };
+  const test = /^hub-test:(.+)$/.exec(chatId);
+  if (test) return { agentId: test[1], conversationKey: 'test' };
+  return null;
+}
 
 function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) return Promise.resolve();
@@ -105,11 +123,16 @@ export class HubManager {
   async start(): Promise<void> {
     if (this.started) return;
     this.started = true;
+    memory.startMaintenance();
     this.syncScheduler();
-    for (const agent of getAutoStartAgents()) {
-      void this.startAgent(agent.id).catch((error) =>
-        log.error({ agent: agent.name, error: errorMessage(error) }, 'Could not auto-start WhatsApp agent'),
-      );
+    if (!config.hubAutoStart) {
+      log.warn('HUB_AUTOSTART=0: agents will not start polling automatically');
+    } else {
+      for (const agent of getAutoStartAgents()) {
+        void this.startAgent(agent.id).catch((error) =>
+          log.error({ agent: agent.name, error: errorMessage(error) }, 'Could not auto-start WhatsApp agent'),
+        );
+      }
     }
     this.publish();
   }
@@ -121,6 +144,7 @@ export class HubManager {
     }
     for (const job of this.jobs.values()) job.stop();
     this.jobs.clear();
+    memory.stopMaintenance();
     await opencode.stop();
     this.publish();
   }
@@ -203,30 +227,21 @@ export class HubManager {
     return this.getAgentSnapshot(agent);
   }
 
-  async refreshAgent(id: string): Promise<void> {
+  async applyAgentChange(id: string): Promise<void> {
     opencode.invalidateConfig();
     const wasRunning = this.running.has(id);
     await this.stopAgent(id);
-    clearSession(id);
-    if (wasRunning) {
-      void this.startAgent(id).catch((error) =>
-        log.error({ agent: id, error: errorMessage(error) }, 'Could not restart agent after configuration change'),
-      );
-    }
-    this.syncScheduler();
-    this.publish();
-  }
-
-  async applyAgentChange(id: string): Promise<void> {
-    opencode.invalidateConfig();
-    await this.stopAgent(id);
-    clearSession(id);
     this.syncScheduler();
     this.publish();
     const agent = getAgent(id);
-    if (agent && agent.enabled && agent.autoStart && agent.hasToken) {
+    // Configuration changes reload OpenCode; conversations keep their sessions and memory.
+    if (agent && agent.enabled && agent.hasToken && (agent.autoStart || wasRunning) && config.hubAutoStart) {
       void this.startAgent(id).catch((error) =>
-        log.error({ agent: id, error: errorMessage(error) }, 'Could not auto-start agent after configuration change'),
+        log.error({ agent: id, error: errorMessage(error) }, 'Could not restart agent after configuration change'),
+      );
+    } else if (opencode.isReady()) {
+      void opencode.syncConfig().catch((error) =>
+        log.warn({ error: errorMessage(error) }, 'Could not resync OpenCode after configuration change'),
       );
     }
   }
@@ -265,7 +280,8 @@ export class HubManager {
         for (const message of poll.messages) {
           if (signal.aborted) break;
           try {
-            await this.handleMessage(agent, client, message, signal);
+            // Always use the latest saved configuration for this agent.
+            await this.handleMessage(getAgent(agent.id) || agent, client, message, signal);
           } catch (error) {
             log.error(
               { agent: agent.name, messageId: message.id, error: errorMessage(error) },
@@ -326,6 +342,49 @@ export class HubManager {
     this.publish();
   }
 
+  /** Builds the context blocks (agent-scoped knowledge + agent-scoped memory) for one prompt. */
+  private async contextFor(agent: HubAgent, conversationKey: string, query: string): Promise<{ knowledge: string; memory: string }> {
+    const [knowledge, memoryBlock] = await Promise.all([
+      this.knowledgeContext(agent, query),
+      agent.memoryEnabled
+        ? memory.buildContext(agent.id, conversationKey, query).catch((error) => {
+            log.debug({ agent: agent.name, error: errorMessage(error) }, 'Memory lookup failed');
+            return '';
+          })
+        : Promise.resolve(''),
+    ]);
+    return { knowledge, memory: memoryBlock };
+  }
+
+  private afterTurn(agent: HubAgent, conversationKey: string, sessionId: string): void {
+    if (!agent.memoryEnabled) return;
+    try {
+      const pending = memory.recordTurn(agent.id, conversationKey);
+      if (pending < getSettings().memoryConsolidateEvery) return;
+      void memory
+        .consolidate(agent.id, conversationKey, (prompt) => opencode.generate(sessionId, prompt))
+        .then(() => this.publish())
+        .catch((error) => log.debug({ agent: agent.name, error: errorMessage(error) }, 'Memory consolidation skipped'));
+    } catch (error) {
+      log.debug({ agent: agent.name, error: errorMessage(error) }, 'Could not record memory turn');
+    }
+  }
+
+  async consolidateNow(agentId: string, conversationKey: string) {
+    const agent = getAgent(agentId);
+    if (!agent) throw new Error('Agent not found.');
+    const session = getSession(agentId, conversationKey);
+    if (!session) throw new Error('This conversation has no active session yet. Send a message first.');
+    const result = await memory.consolidate(
+      agentId,
+      conversationKey,
+      (prompt) => opencode.generate(session.sessionId, prompt),
+      { throwOnError: true },
+    );
+    this.publish();
+    return result;
+  }
+
   private async handleMessage(
     agent: HubAgent,
     client: WhatsAppAgentClient,
@@ -333,20 +392,21 @@ export class HubManager {
     signal: AbortSignal,
   ): Promise<void> {
     if (!message.id || !message.from) return;
-    if (recordHubMessage({
-      messageId: message.id,
-      agentId: agent.id,
-      direction: 'in',
-      peerId: message.from,
-      body: officialMessageText(message),
-    }) === false) {
-      // Already processed by this agent. This can happen if the server replays
-      // an offset after a crash.
+    if (
+      recordHubMessage({
+        messageId: message.id,
+        agentId: agent.id,
+        direction: 'in',
+        peerId: message.from,
+        body: officialMessageText(message),
+      }) === false
+    ) {
+      // Already processed by this agent (the server can replay an offset after a crash).
       return;
     }
 
     const peer = message.from;
-    const chatId = `wa-hub:${agent.id}:${peer}`;
+    const chatId = peerChatId(agent.id, peer);
     const inboundText = officialMessageText(message);
     markAgentSeen(agent.id, peer);
     ensureChat(chatId, `${agent.name} · ${peer}`, false);
@@ -373,11 +433,13 @@ export class HubManager {
         if (downloaded.bytes.byteLength > 20 * 1024 * 1024) {
           log.warn({ agent: agent.name, bytes: downloaded.bytes.byteLength }, 'Skipping oversized WhatsApp media');
         } else {
-          fs.mkdirSync(config.uploadsDir, { recursive: true });
+          // Media is written into this agent's own inbox; no other agent can read it.
+          const inbox = agentInbox(agent.id);
+          fs.mkdirSync(inbox, { recursive: true });
           const filename = sanitizeFilename(
             downloaded.filename || `whatsapp-${message.id}${mediaExtension(downloaded.mimeType)}`,
           );
-          const file = path.join(config.uploadsDir, `hub-${agent.id}-${filename}`);
+          const file = path.join(inbox, `${Date.now()}-${filename}`);
           fs.writeFileSync(file, downloaded.bytes);
           files.push({
             uri: pathToFileURL(file).href,
@@ -390,24 +452,22 @@ export class HubManager {
       }
     }
 
-    const knowledge = await this.knowledgeContext(agent, inboundText);
+    const context = await this.contextFor(agent, peer, inboundText);
     const prompt = [
-      knowledge,
+      context.knowledge,
+      context.memory,
       media ? `The user sent a ${message.type}. Read the attached file if it is available.` : '',
       `Incoming WhatsApp message from ${peer}:\n${inboundText || `[${message.type}]`}`,
     ]
       .filter(Boolean)
       .join('\n\n');
 
-    let responseText = '';
-    let resultError: string | null = null;
     try {
       const result = await opencode.runPrompt(agent, prompt, {
         metadata: { agentId: agent.id, peer, messageId: message.id },
         conversationKey: peer,
         files,
       });
-      responseText = result.text;
       saveMessage({
         chatId,
         role: 'assistant',
@@ -420,6 +480,8 @@ export class HubManager {
           sessionId: result.sessionId,
           latencyMs: result.latencyMs,
           toolCalls: result.toolCalls,
+          usedMemory: Boolean(context.memory),
+          usedKnowledge: Boolean(context.knowledge),
         },
       });
       recordAgentRun({
@@ -442,8 +504,9 @@ export class HubManager {
         body: result.text.slice(0, 500),
       });
       log.info({ agent: agent.name, chars: result.text.length }, 'WhatsApp reply sent');
+      this.afterTurn(agent, peer, result.sessionId);
     } catch (error) {
-      resultError = errorMessage(error);
+      const resultError = errorMessage(error);
       log.error({ agent: agent.name, error: resultError }, 'OpenCode reply failed');
       recordAgentRun({
         chatId,
@@ -476,39 +539,110 @@ export class HubManager {
   private async knowledgeContext(agent: HubAgent, query: string): Promise<string> {
     if (!agent.knowledgeIds.length || !query.trim()) return '';
     try {
-      const results = await rag.search(query, 6, 0.08);
-      const allowed = new Set(agent.knowledgeIds);
-      const selected = results.filter((result) => allowed.has(result.documentId)).slice(0, 4);
+      // Ranking happens only inside this agent's own documents.
+      const selected = await rag.search(query, 4, 0.08, { documentIds: agent.knowledgeIds });
       if (!selected.length) return '';
       const blocks = selected.map(
         (result) =>
           `### ${result.title}\n${result.content.slice(0, 1800).trim()}${result.content.length > 1800 ? '…' : ''}`,
       );
-      return `Reference material (use it only when relevant):\n\n${blocks.join('\n\n')}`;
+      return `Reference material from your knowledge base (use it only when relevant):\n\n${blocks.join('\n\n')}`;
     } catch (error) {
       log.debug({ agent: agent.name, error: errorMessage(error) }, 'Knowledge lookup failed');
       return '';
     }
   }
 
-  async testAgent(id: string, text: string): Promise<{ text: string; model: string; sessionId: string }> {
+  /** Dashboard conversation with an agent. Never touches WhatsApp. */
+  async testAgent(id: string, text: string) {
     const agent = getAgent(id);
     if (!agent) throw new Error('Agent not found.');
-    const result = await opencode.runPrompt(agent, text, {
-      metadata: { test: true, agentId: id },
-      conversationKey: 'test',
-    });
-    return { text: result.text, model: result.model, sessionId: result.sessionId };
+    const chatId = testChatId(id);
+    ensureChat(chatId, `${agent.name} · dashboard`, false);
+    saveMessage({ chatId, role: 'user', content: text, senderName: 'You', meta: { agentId: id, test: true } });
+
+    const context = await this.contextFor(agent, 'test', text);
+    const prompt = [context.knowledge, context.memory, `Message from your manager (dashboard):\n${text}`]
+      .filter(Boolean)
+      .join('\n\n');
+    try {
+      const result = await opencode.runPrompt(agent, prompt, {
+        metadata: { test: true, agentId: id },
+        conversationKey: 'test',
+      });
+      saveMessage({
+        chatId,
+        role: 'assistant',
+        content: result.text,
+        senderName: agent.name,
+        meta: {
+          agentId: id,
+          model: result.model,
+          latencyMs: result.latencyMs,
+          toolCalls: result.toolCalls,
+          usedMemory: Boolean(context.memory),
+          usedKnowledge: Boolean(context.knowledge),
+        },
+      });
+      recordAgentRun({
+        chatId,
+        source: 'dashboard',
+        model: result.model,
+        userText: text,
+        response: result.text,
+        toolCalls: result.toolCalls,
+        tokensIn: result.tokensIn,
+        tokensOut: result.tokensOut,
+        latencyMs: result.latencyMs,
+      });
+      this.afterTurn(agent, 'test', result.sessionId);
+      return {
+        text: result.text,
+        model: result.model,
+        sessionId: result.sessionId,
+        latencyMs: result.latencyMs,
+        toolCalls: result.toolCalls,
+        usedMemory: Boolean(context.memory),
+        usedKnowledge: Boolean(context.knowledge),
+      };
+    } catch (error) {
+      saveMessage({
+        chatId,
+        role: 'system',
+        content: `Error: ${errorMessage(error)}`,
+        senderName: agent.name,
+        meta: { agentId: id, error: true },
+      });
+      throw error;
+    }
+  }
+
+  /** Clears the dashboard conversation's short-term context (session, transcript, working notes). */
+  resetTest(id: string): void {
+    clearSession(id, 'test');
+    resetChat(testChatId(id));
+    memory.clearShortTerm(id, 'test');
+  }
+
+  /** Clears one contact's short-term context. Long-term memory is kept unless forgotten separately. */
+  resetConversation(agentId: string, conversationKey: string): void {
+    clearSession(agentId, conversationKey);
+    memory.clearShortTerm(agentId, conversationKey);
+  }
+
+  private recipientFor(agent: HubAgent): string | null {
+    return agent.ownerId || agent.creatorId;
   }
 
   async sendToCreator(id: string, text: string): Promise<string[]> {
     const agent = getAgent(id);
     if (!agent) throw new Error('Agent not found.');
-    if (!agent.creatorId) throw new Error('No creator has messaged this agent yet.');
+    const recipient = this.recipientFor(agent);
+    if (!recipient) throw new Error('Set an owner ID for this agent (or wait for its first WhatsApp message).');
     const token = getAgentToken(id);
     if (!token) throw new Error('Agent token is missing.');
     const client = new WhatsAppAgentClient(id, token);
-    return client.sendText(agent.creatorId, text);
+    return client.sendText(recipient, text);
   }
 
   async runSchedule(scheduleId: string): Promise<void> {
@@ -520,8 +654,9 @@ export class HubManager {
       return;
     }
     if (!schedule.enabled) return;
-    if (!agent.creatorId) {
-      markScheduleRun(scheduleId, 'The agent has no creator yet. Send it a WhatsApp message first.');
+    const recipient = this.recipientFor(agent);
+    if (!recipient) {
+      markScheduleRun(scheduleId, 'Set an owner ID for this agent, or send it a WhatsApp message first.');
       return;
     }
     const token = getAgentToken(agent.id);
@@ -529,19 +664,21 @@ export class HubManager {
       markScheduleRun(scheduleId, 'The agent token is missing.');
       return;
     }
-    const chatId = `wa-hub:${agent.id}:${agent.creatorId}`;
+    const chatId = peerChatId(agent.id, recipient);
     try {
-      const knowledge = await this.knowledgeContext(agent, schedule.prompt);
+      const context = await this.contextFor(agent, 'schedule', schedule.prompt);
       const result = await opencode.runPrompt(
         agent,
-        [knowledge, `Scheduled task "${schedule.name}":\n${schedule.prompt}`].filter(Boolean).join('\n\n'),
+        [context.knowledge, context.memory, `Scheduled task "${schedule.name}":\n${schedule.prompt}`]
+          .filter(Boolean)
+          .join('\n\n'),
         {
           metadata: { agentId: agent.id, scheduleId, scheduled: true },
           conversationKey: 'schedule',
         },
       );
       const client = new WhatsAppAgentClient(agent.id, token);
-      await client.sendText(agent.creatorId, result.text);
+      await client.sendText(recipient, result.text);
       markScheduleRun(scheduleId, null);
       saveMessage({
         chatId,
@@ -561,6 +698,7 @@ export class HubManager {
         tokensOut: result.tokensOut,
         latencyMs: result.latencyMs,
       });
+      this.afterTurn(agent, 'schedule', result.sessionId);
       log.info({ agent: agent.name, schedule: schedule.name }, 'Scheduled WhatsApp message sent');
     } catch (error) {
       markScheduleRun(scheduleId, errorMessage(error));
@@ -577,13 +715,9 @@ export class HubManager {
     const timezone = getSettings().timezone?.trim();
     for (const schedule of listAllSchedules().filter((item) => item.enabled)) {
       try {
-        const job = new Cron(
-          schedule.cronExpr,
-          { protect: true, ...(timezone ? { timezone } : {}) },
-          () => {
-            void this.runSchedule(schedule.id);
-          },
-        );
+        const job = new Cron(schedule.cronExpr, { protect: true, ...(timezone ? { timezone } : {}) }, () => {
+          void this.runSchedule(schedule.id);
+        });
         this.jobs.set(schedule.id, job);
       } catch (error) {
         const message = errorMessage(error);
@@ -615,10 +749,7 @@ export class HubManager {
     const agents = listAgents().map((agent) => this.getAgentSnapshot(agent));
     const schedules = listAllSchedules().map((schedule) => {
       const job = this.jobs.get(schedule.id);
-      return {
-        ...schedule,
-        nextRun: job?.nextRun()?.toISOString() ?? null,
-      };
+      return { ...schedule, nextRun: job?.nextRun()?.toISOString() ?? null };
     });
     return {
       runtime: {
@@ -637,7 +768,7 @@ export class HubManager {
     return getAgentDetail(id);
   }
 
-  private publish(): void {
+  publish(): void {
     bus.publish('hub:status', this.getStatus());
   }
 }
