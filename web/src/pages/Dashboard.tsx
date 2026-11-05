@@ -1,17 +1,18 @@
-import {
+﻿import {
   Activity,
   ArrowRight,
-  BookOpen,
   Bot,
+  Brain,
   CheckCircle2,
   Circle,
   FlaskConical,
   KeyRound,
   MessagesSquare,
   PlugZap,
+  Plus,
   Settings as SettingsIcon,
   Smartphone,
-  Sparkles,
+  Users,
   Zap,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../components/ui';
@@ -32,29 +33,29 @@ export function DashboardPage(props: {
   const checklist = [
     {
       label: 'Connect OpenRouter',
-      done: status.agent.configured,
-      hint: 'Add an API key to enable replies.',
+      done: status.manager.configured,
+      hint: 'Add an API key so agents can think.',
       page: 'settings' as PageKey,
       icon: KeyRound,
     },
     {
-      label: 'Link WhatsApp',
-      done: status.whatsapp.state === 'connected',
-      hint: 'Scan the QR code with your phone.',
-      page: 'whatsapp' as PageKey,
+      label: 'Create your first agent',
+      done: status.hub.agents > 0,
+      hint: 'Give it an identity, model, and WhatsApp token.',
+      page: 'agents' as PageKey,
       icon: Smartphone,
     },
     {
       label: 'Add knowledge',
-      done: status.agent.knowledge.documents > 0,
-      hint: 'Upload notes, FAQs, or documents.',
+      done: status.knowledge.documents > 0,
+      hint: 'Upload notes, FAQs, or documents agents can use.',
       page: 'knowledge' as PageKey,
-      icon: BookOpen,
+      icon: FlaskConical,
     },
     {
       label: 'Connect an MCP server',
-      done: status.agent.mcp.connected > 0,
-      hint: 'Give the agent real tools and data.',
+      done: status.mcp.connected > 0,
+      hint: 'Give agents real tools and data.',
       page: 'mcp' as PageKey,
       icon: PlugZap,
     },
@@ -65,16 +66,16 @@ export function DashboardPage(props: {
     <div className="space-y-6">
       <PageHeader
         title="Overview"
-        description="Your agent's connection, model, tools, and knowledge at a glance."
+        description="Manager health, agent fleet status, and recent activity."
         actions={
           <>
             <Button variant="outline" onClick={() => props.onNavigate('settings')}>
               <SettingsIcon className="h-4 w-4" />
               Configure
             </Button>
-            <Button onClick={() => props.onNavigate('playground')}>
-              <Sparkles className="h-4 w-4" />
-              Test agent
+            <Button onClick={() => props.onNavigate('agents')}>
+              <Plus className="h-4 w-4" />
+              New agent
             </Button>
           </>
         }
@@ -88,19 +89,15 @@ export function DashboardPage(props: {
               <Bot className="h-6 w-6" />
             </span>
             <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold tracking-tight">{status.agent.botName}</h2>
-                <Badge variant={status.agent.configured ? 'success' : 'warning'}>
-                  {status.agent.configured ? 'Model ready' : 'API key missing'}
-                </Badge>
-                <Badge variant={status.agent.autoReply ? 'success' : 'outline'}>
-                  {status.agent.autoReply ? 'Auto-reply on' : 'Auto-reply off'}
-                </Badge>
-              </div>
-              <p className="font-mono text-xs text-muted-foreground">{status.agent.model}</p>
+              <h2 className="text-lg font-semibold tracking-tight">Agent manager</h2>
+              <Badge variant={status.manager.configured ? 'success' : 'warning'}>
+                {status.manager.configured ? 'Model ready' : 'API key missing'}
+              </Badge>
+              <p className="font-mono text-xs text-muted-foreground">
+                Default model: {status.manager.defaultModel}
+              </p>
               <p className="text-sm text-muted-foreground">
-                Group mode: <span className="text-foreground">{status.agent.groupMode}</span>
-                {' · '}Uptime: <span className="text-foreground">{uptime(status.server.uptime)}</span>
+                Uptime: <span className="text-foreground">{uptime(status.server.uptime)}</span>
               </p>
             </div>
           </div>
@@ -119,10 +116,10 @@ export function DashboardPage(props: {
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard
-          label="Chats"
-          value={fmtNumber(status.stats.chats)}
-          hint={`${fmtNumber(status.stats.messages)} messages stored`}
-          icon={MessagesSquare}
+          label="Agents"
+          value={fmtNumber(status.hub.agents)}
+          hint={`${status.hub.running} polling Â· ${status.hub.withToken} with WhatsApp token`}
+          icon={Users}
           tone="sky"
         />
         <StatCard
@@ -134,17 +131,24 @@ export function DashboardPage(props: {
         />
         <StatCard
           label="Knowledge"
-          value={fmtNumber(status.agent.knowledge.documents)}
-          hint={`${fmtNumber(status.agent.knowledge.chunks)} chunks indexed`}
-          icon={BookOpen}
+          value={fmtNumber(status.knowledge.documents)}
+          hint={`${fmtNumber(status.knowledge.chunks)} chunks indexed`}
+          icon={FlaskConical}
           tone="primary"
         />
         <StatCard
           label="MCP tools"
-          value={fmtNumber(status.agent.mcp.tools)}
-          hint={`${status.agent.mcp.connected} of ${status.agent.mcp.servers} servers connected`}
+          value={fmtNumber(status.mcp.tools)}
+          hint={`${status.mcp.connected} of ${status.mcp.servers} servers connected`}
           icon={PlugZap}
           tone="amber"
+        />
+        <StatCard
+          label="Memories"
+          value={fmtNumber(status.memory.total)}
+          hint="Per-agent long-term and working memory"
+          icon={Brain}
+          tone="emerald"
         />
       </div>
 
@@ -187,7 +191,14 @@ export function DashboardPage(props: {
                           {timeAgo(run.created_at)}
                         </td>
                         <td className="table-td">
-                          <Badge variant={run.source === 'whatsapp' ? 'success' : 'secondary'} size="sm">
+                          <Badge
+                            variant={
+                              run.source === 'whatsapp-agent-platform' ? 'success' : run.source === 'schedule'
+                                ? 'warning'
+                                : 'secondary'
+                            }
+                            size="sm"
+                          >
                             {run.source}
                           </Badge>
                         </td>
@@ -206,12 +217,7 @@ export function DashboardPage(props: {
                 compact
                 icon={FlaskConical}
                 title="No runs yet"
-                description="Send a message in the playground or WhatsApp to see agent activity here."
-                action={
-                  <Button size="sm" variant="outline" onClick={() => props.onNavigate('playground')}>
-                    Open playground
-                  </Button>
-                }
+                description="Start an agent and let it handle WhatsApp messages, or run a schedule to see activity here."
               />
             )}
           </CardContent>
@@ -266,17 +272,14 @@ export function DashboardPage(props: {
           <InfoRow label="Host" value={`${status.server.host}:${status.server.port}`} mono />
           <InfoRow label="App URL" value={status.server.appUrl} mono />
           <InfoRow label="Version" value={status.server.version} />
+          <InfoRow label="Provider" value={status.manager.provider} />
           <InfoRow
             label="Embeddings"
-            value={status.agent.knowledge.embeddingsReady ? 'Ready (local)' : 'Keyword-only fallback'}
+            value={status.knowledge.embeddingsReady ? 'Ready (local)' : 'Keyword-only fallback'}
           />
           <InfoRow
             label="Embedded chunks"
-            value={`${fmtNumber(status.agent.knowledge.embeddedChunks)} / ${fmtNumber(status.agent.knowledge.chunks)}`}
-          />
-          <InfoRow
-            label="WhatsApp since"
-            value={status.whatsapp.connectedAt ? timeAgo(status.whatsapp.connectedAt) : '—'}
+            value={`${fmtNumber(status.knowledge.embeddedChunks)} / ${fmtNumber(status.knowledge.chunks)}`}
           />
         </CardContent>
       </Card>

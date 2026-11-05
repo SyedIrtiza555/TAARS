@@ -234,7 +234,7 @@ export function LogsPage() {
                               {timeAgo(run.created_at)}
                             </td>
                             <td className="table-td">
-                              <Badge variant={run.source === 'whatsapp' ? 'success' : 'secondary'} size="sm">
+                              <Badge variant={run.source === 'whatsapp-agent-platform' ? 'success' : 'secondary'} size="sm">
                                 {run.source}
                               </Badge>
                             </td>

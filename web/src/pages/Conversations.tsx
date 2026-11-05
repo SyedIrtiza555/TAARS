@@ -5,7 +5,6 @@ import {
   MessageSquare,
   RefreshCw,
   Search,
-  Send,
   Trash2,
   Users,
   Wrench,
@@ -15,7 +14,7 @@ import { EmptyState, ErrorBlock, LoadingBlock, PageHeader } from '../components/
 import type { Notify } from '../components/common';
 import { RichText } from '../lib/markdown';
 import { useApi } from '../lib/useApi';
-import { fmtTime, shortJid, timeAgo } from '../lib/types';
+import { fmtTime, timeAgo } from '../lib/types';
 import type { ChatSummary, Message } from '../lib/types';
 import { cn } from '../lib/utils';
 import { api } from '../api';
@@ -27,8 +26,6 @@ export function ConversationsPage({ notify }: { notify: Notify }) {
   const messages = useApi<Message[]>(
     selected ? `/conversations/${encodeURIComponent(selected)}/messages?limit=200` : null,
   );
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -39,12 +36,13 @@ export function ConversationsPage({ notify }: { notify: Notify }) {
     return list.filter(
       (chat) =>
         (chat.name ?? '').toLowerCase().includes(needle) ||
-        chat.chat_id.toLowerCase().includes(needle),
+        chat.chat_id.toLowerCase().includes(needle) ||
+        shortJid(chat.chat_id).toLowerCase().includes(needle),
     );
   }, [chats.data, query]);
 
   const activeChat = useMemo(
-    () => (chats.data ?? []).find((chat) => chat.chat_id === selected) ?? null,
+    () => (chats.data ?? []).find((chat) => chat.chat_id === selected || shortJid(chat.chat_id) === selected) ?? null,
     [chats.data, selected],
   );
 
@@ -58,28 +56,10 @@ export function ConversationsPage({ notify }: { notify: Notify }) {
   useEffect(() => {
     const node = scrollRef.current;
     if (node) node.scrollTop = node.scrollHeight;
-  }, [messages.data, sending]);
+  }, [messages.data]);
 
   const openChat = (chatId: string) => {
     setSelected(chatId);
-    setDraft('');
-  };
-
-  const send = async () => {
-    const text = draft.trim();
-    if (!text || !selected || sending) return;
-    setSending(true);
-    setDraft('');
-    try {
-      await api.post(`/conversations/${encodeURIComponent(selected)}/send`, { text });
-      await messages.refetch(true);
-      await chats.refetch(true);
-    } catch (error) {
-      setDraft(text);
-      notify(error instanceof Error ? error.message : 'Message failed', 'error');
-    } finally {
-      setSending(false);
-    }
   };
 
   const resetContext = async () => {
@@ -191,7 +171,6 @@ export function ConversationsPage({ notify }: { notify: Notify }) {
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-2">
                             <span className="truncate text-sm font-medium">{display}</span>
-                            {chat.is_group ? <Badge variant="secondary" size="sm">group</Badge> : null}
                           </span>
                           <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
                             {shortJid(chat.chat_id)}
@@ -234,9 +213,8 @@ export function ConversationsPage({ notify }: { notify: Notify }) {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 truncate text-sm font-semibold">
                     {activeChat?.name || shortJid(selected)}
-                    {activeChat?.is_group ? <Badge variant="secondary" size="sm">group</Badge> : null}
                   </p>
-                  <p className="truncate font-mono text-[11px] text-muted-foreground">{selected}</p>
+                  <p className="truncate font-mono text-[11px] text-muted-foreground">{shortJid(selected)}</p>
                 </div>
                 <Button size="sm" variant="outline" disabled={busy} onClick={() => void resetContext()}>
                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
@@ -257,39 +235,17 @@ export function ConversationsPage({ notify }: { notify: Notify }) {
                   <EmptyState
                     icon={MessageSquare}
                     title="No stored messages"
-                    description="Send the first message below to start a transcript."
+                    description="Messages appear here as contacts talk to your agents on WhatsApp."
                   />
                 ) : (
                   messages.data!.map((message) => <MessageBubble key={message.id} message={message} />)
                 )}
-                {sending && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Agent is thinking…
-                  </div>
-                )}
               </div>
 
-              <div className="border-t border-border p-3">
-                <div className="flex items-end gap-2">
-                  <textarea
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        void send();
-                      }
-                    }}
-                    rows={2}
-                    placeholder="Message this contact — Enter to send, Shift+Enter for a new line"
-                    className="max-h-40 min-h-[2.75rem] flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <Button disabled={!draft.trim() || sending} onClick={() => void send()} className="h-11">
-                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    Send
-                  </Button>
-                </div>
+              <div className="border-t border-border bg-background/40 px-3 py-2.5">
+                <p className="text-[11px] text-muted-foreground">
+                  Read-only transcript — agents send and receive through their own WhatsApp integrations.
+                </p>
               </div>
             </>
           ) : (
@@ -297,7 +253,7 @@ export function ConversationsPage({ notify }: { notify: Notify }) {
               <EmptyState
                 icon={MessageSquare}
                 title="Select a conversation"
-                description="Pick a chat on the left to read the transcript and reply."
+                description="Pick a chat on the left to read the transcript."
               />
             </div>
           )}
@@ -342,6 +298,10 @@ function MessageBubble({ message }: { message: Message }) {
       </div>
     </div>
   );
+}
+
+function shortJid(chatId: string): string {
+  return chatId.replace(/@s\.whatsapp\.net$/, '').replace(/@g\.us$/, '');
 }
 
 function initials(value: string): string {

@@ -1,29 +1,12 @@
 export type SettingPatch = Partial<{
-  botName: string;
-  systemPrompt: string;
   model: string;
-  temperature: number;
-  maxTokens: number;
-  maxHistory: number;
-  autoReply: boolean;
-  autoConnect: boolean;
-  groupMode: 'mention' | 'all' | 'off';
-  allowedJids: string[];
-  blockedJids: string[];
-  ragEnabled: boolean;
-  ragAutoInject: boolean;
-  ragTopK: number;
-  ragMinScore: number;
-  typingIndicator: boolean;
-  readReceipts: boolean;
-  maxToolSteps: number;
-  toolTimeoutMs: number;
-  appendSignature: boolean;
-  signature: string;
-  fallbackMessage: string;
-  maxCharsPerMessage: number;
   timezone: string;
-  status: 'available' | 'away';
+  provider: 'openrouter' | 'groq';
+  groqApiKey: string;
+  memoryConsolidateEvery: number;
+  memoryMaxPerAgent: number;
+  memoryWorkingTtlHours: number;
+  memoryRetrieveLimit: number;
 }>;
 
 export type McpServer = {
@@ -55,6 +38,7 @@ export type Doc = {
   error: string | null;
   char_count: number;
   chunk_count: number;
+  owner_agent_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -82,43 +66,27 @@ export type LogEntry = {
   meta?: Record<string, unknown>;
 };
 
-export type WhatsAppSnapshot = {
-  state: 'disconnected' | 'connecting' | 'qr' | 'connected' | 'logged_out' | 'error';
-  phoneNumber: string | null;
-  name: string | null;
-  qrDataUrl: string | null;
-  qrIssuedAt: string | null;
-  lastError: string | null;
-  connectedAt: string | null;
-  startedAt: string | null;
+export type AgentCapabilities = {
+  webfetch: boolean;
+  websearch: boolean;
 };
 
-export type AppStatus = {
-  server: { version: string; uptime: number; host: string; port: number; appUrl: string };
-  whatsapp: WhatsAppSnapshot;
-  agent: {
-    configured: boolean;
-    model: string;
-    botName: string;
-    autoReply: boolean;
-    groupMode: string;
-    status: 'available' | 'away';
-    mcp: { servers: number; enabled: number; connected: number; tools: number };
-    knowledge: {
-      documents: number;
-      chunks: number;
-      embeddedChunks: number;
-      embeddingsReady: boolean;
-      embeddingsError: string | null;
-    };
-  };
-  hub: { agents: number; running: number; runtimeReady: boolean };
-  stats: { chats: number; messages: number; agentRuns: number; tokensIn: number; tokensOut: number };
+export type AgentProfile = {
+  title: string;
+  roleDescription: string;
+  personality: string;
+  communicationStyle: string;
+  objectives: string;
+  operatingPrinciples: string;
+  decisionStyle: string;
+  avatar: string | null;
+  color: string;
 };
 
 export type ChatSummary = {
   chat_id: string;
   name: string | null;
+  agent_id: string | null;
   is_group: number;
   message_count: number;
   last_message_at: string | null;
@@ -172,6 +140,140 @@ export type SettingsShape = Required<SettingPatch>;
 export type SettingsResponse = {
   settings: SettingsShape;
   openrouter: { configured: boolean; source: string; maskedKey: string };
+};
+
+export type AgentMemory = {
+  id: string;
+  agentId: string;
+  conversationKey: string;
+  tier: 'long_term' | 'working';
+  kind: string;
+  content: string;
+  importance: number;
+  source: 'auto' | 'manual';
+  accessCount: number;
+  lastAccessedAt: string | null;
+  expiresAt: string | null;
+  hasEmbedding: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ConversationState = {
+  agentId: string;
+  conversationKey: string;
+  summary: string;
+  turns: number;
+  pendingTurns: number;
+  lastConsolidatedAt: string | null;
+  lastError: string | null;
+  updatedAt: string;
+};
+
+export type MemoryStats = {
+  longTerm: number;
+  working: number;
+  conversations: number;
+};
+
+export type HubAgentBase = AgentProfile & {
+  id: string;
+  name: string;
+  model: string;
+  systemPrompt: string;
+  capabilities: AgentCapabilities;
+  memoryEnabled: boolean;
+  ownerId: string | null;
+  enabled: boolean;
+  autoStart: boolean;
+  typingIndicator: boolean;
+  readReceipts: boolean;
+  creatorId: string | null;
+  nextOffset: string | null;
+  status: string;
+  lastError: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  hasToken: boolean;
+  mcpServerIds: string[];
+  knowledgeIds: string[];
+  sessionId: string | null;
+  skillCount: number;
+  scheduleCount: number;
+  memoryCount: number;
+  privateKnowledgeCount: number;
+};
+
+export type HubAgent = HubAgentBase & {
+  running: boolean;
+  runtimeStartedAt: string | null;
+  nextRun: string | null;
+};
+
+export type HubSkill = {
+  id: string;
+  agentId: string;
+  name: string;
+  description: string;
+  body: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type HubSchedule = {
+  id: string;
+  agentId: string;
+  name: string;
+  cronExpr: string;
+  prompt: string;
+  enabled: boolean;
+  lastRun: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  nextRun?: string | null;
+};
+
+export type HubAgentDetail = HubAgentBase & {
+  skills: HubSkill[];
+  schedules: HubSchedule[];
+};
+
+export type HubRuntime = {
+  ready: boolean;
+  baseUrl: string | null;
+  logTail: string[];
+};
+
+export type HubStatus = {
+  runtime: HubRuntime;
+  agents: HubAgent[];
+  schedules: HubSchedule[];
+  schedulerError: string | null;
+  running: number;
+};
+
+export type AppStatus = {
+  server: { version: string; uptime: number; host: string; port: number; appUrl: string };
+  manager: {
+    configured: boolean;
+    provider: string;
+    defaultModel: string;
+    hubAutoStart: boolean;
+  };
+  mcp: { servers: number; enabled: number; connected: number; tools: number };
+  knowledge: {
+    documents: number;
+    chunks: number;
+    embeddedChunks: number;
+    embeddingsReady: boolean;
+    embeddingsError: string | null;
+  };
+  hub: { agents: number; running: number; withToken: number; runtimeReady: boolean };
+  memory: { total: number };
+  stats: { chats: number; messages: number; agentRuns: number; tokensIn: number; tokensOut: number };
 };
 
 export function fmtNumber(value: number | null | undefined): string {
@@ -235,80 +337,8 @@ export function parseKeyValues(text: string): Record<string, string> {
   return result;
 }
 
-export function shortJid(chatId: string): string {
-  return chatId.replace(/@s\.whatsapp\.net$/, '').replace(/@g\.us$/, '');
+export function initials(value: string): string {
+  const parts = value.trim().split(/\s+/).slice(0, 2);
+  const text = parts.map((part) => part[0]?.toUpperCase() ?? '').join('');
+  return text || '?';
 }
-
-export type HubAgentBase = {
-  id: string;
-  name: string;
-  model: string;
-  systemPrompt: string;
-  enabled: boolean;
-  autoStart: boolean;
-  typingIndicator: boolean;
-  readReceipts: boolean;
-  creatorId: string | null;
-  nextOffset: string | null;
-  status: string;
-  lastError: string | null;
-  lastSeenAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  hasToken: boolean;
-  mcpServerIds: string[];
-  knowledgeIds: string[];
-  sessionId: string | null;
-  skillCount: number;
-  scheduleCount: number;
-};
-
-export type HubAgent = HubAgentBase & {
-  running: boolean;
-  runtimeStartedAt: string | null;
-  nextRun: string | null;
-};
-
-export type HubSkill = {
-  id: string;
-  agentId: string;
-  name: string;
-  description: string;
-  body: string;
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type HubSchedule = {
-  id: string;
-  agentId: string;
-  name: string;
-  cronExpr: string;
-  prompt: string;
-  enabled: boolean;
-  lastRun: string | null;
-  lastError: string | null;
-  createdAt: string;
-  updatedAt: string;
-  nextRun?: string | null;
-};
-
-export type HubAgentDetail = HubAgentBase & {
-  skills: HubSkill[];
-  schedules: HubSchedule[];
-};
-
-export type HubRuntime = {
-  ready: boolean;
-  baseUrl: string | null;
-  logTail: string[];
-};
-
-export type HubStatus = {
-  runtime: HubRuntime;
-  agents: HubAgent[];
-  schedules: HubSchedule[];
-  schedulerError: string | null;
-  running: number;
-};

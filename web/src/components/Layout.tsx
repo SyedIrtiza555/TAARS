@@ -3,7 +3,6 @@ import {
   BookOpen,
   Bot,
   ChevronRight,
-  FlaskConical,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -20,11 +19,9 @@ import type { AppStatus } from '../lib/types';
 import { Badge } from './ui';
 
 export type PageKey =
-  | 'dashboard'
+  | 'team'
   | 'agents'
-  | 'whatsapp'
   | 'conversations'
-  | 'playground'
   | 'knowledge'
   | 'mcp'
   | 'settings'
@@ -35,11 +32,9 @@ export const NAV: Array<{
   label: string;
   icon: ComponentType<{ className?: string }>;
 }> = [
-  { key: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-  { key: 'agents', label: 'Agents', icon: Users },
-  { key: 'whatsapp', label: 'WhatsApp', icon: Smartphone },
-  { key: 'conversations', label: 'Conversations', icon: MessagesSquare },
-  { key: 'playground', label: 'Playground', icon: FlaskConical },
+  { key: 'team', label: 'Team', icon: Users },
+  { key: 'agents', label: 'Agents', icon: Smartphone },
+  { key: 'conversations', label: 'Chats', icon: MessagesSquare },
   { key: 'knowledge', label: 'Knowledge', icon: BookOpen },
   { key: 'mcp', label: 'MCP Tools', icon: PlugZap },
   { key: 'settings', label: 'Settings', icon: Settings },
@@ -48,15 +43,6 @@ export const NAV: Array<{
 
 export function isPageKey(value: string): value is PageKey {
   return NAV.some((item) => item.key === value);
-}
-
-export function waTone(state: AppStatus['whatsapp']['state'] | undefined) {
-  if (state === 'connected') return { label: 'Connected', dot: 'bg-emerald-400', text: 'text-emerald-300', variant: 'success' as const };
-  if (state === 'qr') return { label: 'Scan QR', dot: 'bg-amber-400', text: 'text-amber-300', variant: 'warning' as const };
-  if (state === 'connecting') return { label: 'Connecting', dot: 'bg-sky-400', text: 'text-sky-300', variant: 'secondary' as const };
-  if (state === 'logged_out') return { label: 'Logged out', dot: 'bg-red-400', text: 'text-red-300', variant: 'destructive' as const };
-  if (state === 'error') return { label: 'Error', dot: 'bg-red-400', text: 'text-red-300', variant: 'destructive' as const };
-  return { label: 'Disconnected', dot: 'bg-slate-400', text: 'text-muted-foreground', variant: 'outline' as const };
 }
 
 function NavList(props: { page: PageKey; onNavigate: (page: PageKey) => void }) {
@@ -90,8 +76,8 @@ function Brand() {
         <Bot className="h-5 w-5" />
       </span>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold tracking-tight">WhatsApp Agent</p>
-        <p className="truncate text-[11px] text-muted-foreground">AI control room</p>
+        <p className="truncate text-sm font-semibold tracking-tight">Agent Manager</p>
+        <p className="truncate text-[11px] text-muted-foreground">WhatsApp AI workforce control room</p>
       </div>
     </div>
   );
@@ -104,8 +90,6 @@ export function Sidebar(props: {
   open: boolean;
   onClose: () => void;
 }) {
-  const tone = waTone(props.status?.whatsapp.state);
-
   return (
     <>
       {props.open && (
@@ -137,25 +121,20 @@ export function Sidebar(props: {
         <NavList page={props.page} onNavigate={props.onNavigate} />
 
         <div className="border-t border-border p-3">
-          <button
-            type="button"
-            onClick={() => props.onNavigate('whatsapp')}
-            className="flex w-full items-center gap-2.5 rounded-lg border border-border/70 bg-background/40 px-3 py-2.5 text-left transition-colors hover:bg-accent/50"
-          >
+          <div className="flex items-center gap-2.5 rounded-lg border border-border/70 bg-background/40 px-3 py-2.5 text-left">
             <span className="relative flex h-2 w-2 shrink-0">
-              <span className={cn('absolute inline-flex h-full w-full animate-ping rounded-full opacity-40', tone.dot)} />
-              <span className={cn('relative inline-flex h-2 w-2 rounded-full', tone.dot)} />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-xs font-medium">{tone.label}</span>
+              <span className="block text-xs font-medium">OpenCode runtime</span>
               <span className="block truncate text-[11px] text-muted-foreground">
-                {props.status?.whatsapp.phoneNumber || 'WhatsApp not linked'}
+                {props.status?.hub.runtimeReady ? 'ready' : 'starts on demand'}
               </span>
             </span>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          </button>
+          </div>
           <p className="mt-2 px-1 text-[10px] text-muted-foreground">
-            v{props.status?.server.version ?? '1.0.0'}
+            v{props.status?.server.version ?? '2.0.0'}
           </p>
         </div>
       </aside>
@@ -171,7 +150,6 @@ export function TopBar(props: {
   onSignOut: () => void;
 }) {
   const item = NAV.find((entry) => entry.key === props.page);
-  const tone = waTone(props.status?.whatsapp.state);
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-xl">
@@ -195,14 +173,8 @@ export function TopBar(props: {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <button type="button" onClick={() => props.onNavigate('whatsapp')} title="WhatsApp status">
-            <Badge variant={tone.variant} className="hidden sm:inline-flex">
-              <span className={cn('h-1.5 w-1.5 rounded-full', tone.dot)} />
-              {tone.label}
-            </Badge>
-          </button>
           <span className="hidden max-w-36 truncate text-xs text-muted-foreground md:block">
-            {props.status?.whatsapp.phoneNumber || ''}
+            {props.status?.manager.defaultModel || '—'}
           </span>
           <button
             type="button"

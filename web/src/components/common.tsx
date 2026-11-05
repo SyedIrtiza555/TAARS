@@ -28,13 +28,14 @@ export function StatCard(props: {
   value: ReactNode;
   hint?: ReactNode;
   icon: ComponentType<{ className?: string }>;
-  tone?: 'primary' | 'sky' | 'violet' | 'amber';
+  tone?: 'primary' | 'sky' | 'violet' | 'amber' | 'emerald';
 }) {
   const tones = {
     primary: 'bg-primary/10 text-primary',
     sky: 'bg-sky-500/10 text-sky-400',
     violet: 'bg-violet-500/10 text-violet-400',
     amber: 'bg-amber-500/10 text-amber-400',
+    emerald: 'bg-emerald-500/10 text-emerald-400',
   } as const;
   const Icon = props.icon;
 
@@ -131,13 +132,20 @@ export function CheckRow(props: {
   onChange: (checked: boolean) => void;
   label: string;
   hint?: string;
+  disabled?: boolean;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border/60 bg-background/40 p-3 transition-colors hover:bg-accent/40">
+    <label
+      className={cn(
+        'flex items-start gap-2.5 rounded-lg border border-border/60 bg-background/40 p-3 transition-colors',
+        props.disabled ? 'opacity-70' : 'cursor-pointer hover:bg-accent/40',
+      )}
+    >
       <input
         type="checkbox"
         checked={props.checked}
         onChange={(event) => props.onChange(event.target.checked)}
+        disabled={props.disabled}
         className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[hsl(var(--primary))]"
       />
       <span className="min-w-0">

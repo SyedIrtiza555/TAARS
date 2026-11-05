@@ -56,6 +56,7 @@ const DEFAULT_PROMPT =
 
 type FormState = {
   name: string;
+  title: string;
   model: string;
   systemPrompt: string;
   token: string;
@@ -63,14 +64,29 @@ type FormState = {
   autoStart: boolean;
   typingIndicator: boolean;
   readReceipts: boolean;
+  roleDescription: string;
+  personality: string;
+  communicationStyle: string;
+  objectives: string;
+  operatingPrinciples: string;
+  decisionStyle: string;
+  avatar: string;
+  color: string;
+  webfetch: boolean;
+  websearch: boolean;
+  memoryEnabled: boolean;
+  ownerId: string;
 };
 
 type SkillDraft = { name: string; description: string; body: string };
 type ScheduleDraft = { name: string; cronExpr: string; prompt: string };
 
+const DEFAULT_COLOR = '#22c55e';
+
 function emptyForm(model = DEFAULT_MODEL): FormState {
   return {
     name: '',
+    title: '',
     model,
     systemPrompt: DEFAULT_PROMPT,
     token: '',
@@ -78,6 +94,18 @@ function emptyForm(model = DEFAULT_MODEL): FormState {
     autoStart: true,
     typingIndicator: true,
     readReceipts: true,
+    roleDescription: '',
+    personality: '',
+    communicationStyle: '',
+    objectives: '',
+    operatingPrinciples: '',
+    decisionStyle: '',
+    avatar: '',
+    color: DEFAULT_COLOR,
+    webfetch: false,
+    websearch: false,
+    memoryEnabled: true,
+    ownerId: '',
   };
 }
 
@@ -94,6 +122,7 @@ function preferredModel(value: string | undefined): string {
 function formFromAgent(agent: HubAgentDetail): FormState {
   return {
     name: agent.name,
+    title: agent.title,
     model: agent.model,
     systemPrompt: agent.systemPrompt,
     token: '',
@@ -101,6 +130,18 @@ function formFromAgent(agent: HubAgentDetail): FormState {
     autoStart: agent.autoStart,
     typingIndicator: agent.typingIndicator,
     readReceipts: agent.readReceipts,
+    roleDescription: agent.roleDescription,
+    personality: agent.personality,
+    communicationStyle: agent.communicationStyle,
+    objectives: agent.objectives,
+    operatingPrinciples: agent.operatingPrinciples,
+    decisionStyle: agent.decisionStyle,
+    avatar: agent.avatar ?? '',
+    color: agent.color || DEFAULT_COLOR,
+    webfetch: agent.capabilities.webfetch,
+    websearch: agent.capabilities.websearch,
+    memoryEnabled: agent.memoryEnabled,
+    ownerId: agent.ownerId ?? '',
   };
 }
 
@@ -128,6 +169,7 @@ export function AgentsPage(props: { notify: Notify; defaultModel?: string }) {
   const [knowledgeIds, setKnowledgeIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [testText, setTestText] = useState('Hello! What can you help me with?');
   const [testResult, setTestResult] = useState('');
   const [sendText, setSendText] = useState('Hello from the local agent hub.');
@@ -195,6 +237,7 @@ export function AgentsPage(props: { notify: Notify; defaultModel?: string }) {
     setSelectedId(null);
     setDetail(null);
     setForm(emptyForm(recommendedModel));
+    setAvatarPreview(null);
     setMcpIds((mcp.data?.servers ?? []).filter((server) => server.enabled).map((server) => server.id));
     setKnowledgeIds([]);
     setTestResult('');
@@ -215,12 +258,24 @@ export function AgentsPage(props: { notify: Notify; defaultModel?: string }) {
     try {
       const payload: Record<string, unknown> = {
         name: form.name.trim(),
+        title: form.title.trim(),
         model: form.model.trim() || DEFAULT_MODEL,
         systemPrompt: form.systemPrompt,
         enabled: form.enabled,
         autoStart: form.autoStart,
         typingIndicator: form.typingIndicator,
         readReceipts: form.readReceipts,
+        roleDescription: form.roleDescription.trim(),
+        personality: form.personality.trim(),
+        communicationStyle: form.communicationStyle.trim(),
+        objectives: form.objectives.trim(),
+        operatingPrinciples: form.operatingPrinciples.trim(),
+        decisionStyle: form.decisionStyle.trim(),
+        avatar: form.avatar || null,
+        color: form.color || DEFAULT_COLOR,
+        capabilities: { webfetch: form.webfetch, websearch: form.websearch },
+        memoryEnabled: form.memoryEnabled,
+        ownerId: form.ownerId.trim() || null,
         mcpServerIds: mcpIds,
         knowledgeIds,
       };
@@ -664,6 +719,9 @@ export function AgentsPage(props: { notify: Notify; defaultModel?: string }) {
                           token missing
                         </Badge>
                       )}
+                      {detail?.avatar && (
+                        <img src={detail.avatar} alt="" className="h-8 w-8 rounded-full border border-border object-cover" />
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {creating
@@ -826,7 +884,7 @@ export function AgentsPage(props: { notify: Notify; defaultModel?: string }) {
 
                   <Field
                     label="System prompt"
-                    hint="OpenCode also receives a WhatsApp-specific base prompt and any enabled skills below."
+                    hint="OpenCode also receives the agent's identity and any enabled skills below."
                   >
                     <Textarea
                       value={form.systemPrompt}
@@ -836,6 +894,132 @@ export function AgentsPage(props: { notify: Notify; defaultModel?: string }) {
                       placeholder="Describe the agent's role, tone, and rules…"
                     />
                   </Field>
+
+                  <Card className="border-t border-border pt-4">
+                    <CardHeader className="space-y-0">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        Identity &amp; personality
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Professional title" hint="Research Analyst, Executive Assistant, …">
+                          <Input
+                            value={form.title}
+                            onChange={(event) => patchForm({ title: event.target.value })}
+                            placeholder="Title"
+                          />
+                        </Field>
+                        <Field label="Avatar color">
+                          <Input
+                            type="color"
+                            value={form.color}
+                            onChange={(event) => patchForm({ color: event.target.value })}
+                            className="h-10 w-full rounded-lg border border-input px-2 py-2 cursor-pointer bg-transparent"
+                          />
+                        </Field>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Field label="Avatar image (optional)" hint="PNG, JPEG, WebP or GIF as a data URL.">
+                          <Textarea
+                            value={form.avatar}
+                            onChange={(event) => {
+                              patchForm({ avatar: event.target.value });
+                              setAvatarPreview(event.target.value || null);
+                            }}
+                            rows={2}
+                            className="font-mono text-xs"
+                            placeholder="data:image/png;base64,…"
+                          />
+                          {form.avatar && (
+                            <img src={form.avatar} alt="avatar preview" className="mt-2 h-16 w-16 rounded-lg border object-cover" />
+                          )}
+                        </Field>
+                        <Field label="Role &amp; responsibilities">
+                          <Textarea
+                            value={form.roleDescription}
+                            onChange={(event) => patchForm({ roleDescription: event.target.value })}
+                            rows={3}
+                            className="font-mono text-xs"
+                            placeholder="What this agent is accountable for…"
+                          />
+                        </Field>
+                        <Field label="Personality">
+                          <Textarea
+                            value={form.personality}
+                            onChange={(event) => patchForm({ personality: event.target.value })}
+                            rows={3}
+                            className="font-mono text-xs"
+                            placeholder="Analytical and detail-oriented…"
+                          />
+                        </Field>
+                        <Field label="Communication style">
+                          <Textarea
+                            value={form.communicationStyle}
+                            onChange={(event) => patchForm({ communicationStyle: event.target.value })}
+                            rows={3}
+                            className="font-mono text-xs"
+                            placeholder="Short, structured answers…"
+                          />
+                        </Field>
+                        <Field label="Objectives">
+                          <Textarea
+                            value={form.objectives}
+                            onChange={(event) => patchForm({ objectives: event.target.value })}
+                            rows={3}
+                            className="font-mono text-xs"
+                            placeholder="What the agent should aim to achieve…"
+                          />
+                        </Field>
+                        <Field label="Operating principles">
+                          <Textarea
+                            value={form.operatingPrinciples}
+                            onChange={(event) => patchForm({ operatingPrinciples: event.target.value })}
+                            rows={3}
+                            className="font-mono text-xs"
+                            placeholder="Never guess; say when unsure…"
+                          />
+                        </Field>
+                        <Field label="Decision-making preferences">
+                          <Textarea
+                            value={form.decisionStyle}
+                            onChange={(event) => patchForm({ decisionStyle: event.target.value })}
+                            rows={3}
+                            className="font-mono text-xs"
+                            placeholder="Evidence first…"
+                          />
+                        </Field>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <CheckRow
+                          checked={form.memoryEnabled}
+                          onChange={(checked) => patchForm({ memoryEnabled: checked })}
+                          label="Memory enabled"
+                          hint="Remembers facts and preferences from its own conversations."
+                        />
+                        <CheckRow
+                          checked={form.webfetch}
+                          onChange={(checked) => patchForm({ webfetch: checked })}
+                          label="Web fetch"
+                          hint="Allow reading web pages."
+                        />
+                        <CheckRow
+                          checked={form.websearch}
+                          onChange={(checked) => patchForm({ websearch: checked })}
+                          label="Web search"
+                          hint="Allow searching the web."
+                        />
+                      </div>
+                      <Field label="Owner peer ID (optional)" hint="Schedules and dashboard sends go to this WhatsApp peer instead of the first sender.">
+                        <Input
+                          value={form.ownerId}
+                          onChange={(event) => patchForm({ ownerId: event.target.value })}
+                          placeholder="+15551234567"
+                        />
+                      </Field>
+                    </CardContent>
+                  </Card>
 
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
                     <p className="text-xs text-muted-foreground">

@@ -4,7 +4,6 @@ import { api } from './api';
 import { Sidebar, TopBar, isPageKey } from './components/Layout';
 import type { PageKey } from './components/Layout';
 import { ToastStack } from './components/common';
-import { OnboardingWizard } from './components/Onboarding';
 import { AnnotationOverlay } from './components/AnnotationOverlay';
 import type { Notify, ToastItem } from './components/common';
 import { Button } from './components/ui';
@@ -12,30 +11,24 @@ import type { AppStatus } from './lib/types';
 import { Login } from './pages/Login';
 import { DashboardPage } from './pages/Dashboard';
 import { AgentsPage } from './pages/Agents';
-import { WhatsAppPage } from './pages/WhatsApp';
 import { ConversationsPage } from './pages/Conversations';
-import { PlaygroundPage } from './pages/Playground';
 import { KnowledgePage } from './pages/Knowledge';
 import { McpPage } from './pages/Mcp';
 import { SettingsPage } from './pages/Settings';
 import { LogsPage } from './pages/Logs';
+import { TeamPage } from './pages/Team';
 
 type AuthState = 'checking' | 'in' | 'out';
 
 const SSE_EVENTS = [
   'hello',
   'log',
-  'whatsapp:status',
-  'agent:run',
-  'agent:tool',
-  'mcp:status',
-  'mcp:changed',
   'hub:status',
 ];
 
 function pageFromHash(): PageKey {
   const value = window.location.hash.replace(/^#\/?/, '');
-  return isPageKey(value) ? value : 'dashboard';
+  return isPageKey(value) ? value : 'team';
 }
 
 function useStatus(enabled: boolean) {
@@ -126,12 +119,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onUnauthorized = () => setAuth('out');
-    window.addEventListener('wa:unauthorized', onUnauthorized);
-    return () => window.removeEventListener('wa:unauthorized', onUnauthorized);
-  }, []);
-
-  useEffect(() => {
     const onHash = () => setPage(pageFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -207,7 +194,7 @@ export default function App() {
           {!status ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Connecting to the agent…</p>
+              <p className="text-sm text-muted-foreground">Connecting to the manager…</p>
               {statusError && (
                 <div className="space-y-2">
                   <p className="text-xs text-red-300">{statusError}</p>
@@ -220,17 +207,9 @@ export default function App() {
             </div>
           ) : (
             <div key={page} className="mx-auto w-full max-w-[1400px] animate-fade-up p-4 sm:p-6 lg:p-8">
-              {status && !wizardSkipped && (!status.agent.configured || status.whatsapp.state !== 'connected') && (
-                <div className="mb-4">
-                  <OnboardingWizard status={status} onClose={() => { setWizardSkipped(true); try { localStorage.setItem('wizardSkipped', '1'); } catch {} }} />
-                </div>
-              )}
-
-              {page === 'dashboard' && <DashboardPage status={status} onNavigate={navigate} />}
-              {page === 'agents' && <AgentsPage notify={notify} defaultModel={status.agent.model} />}
-              {page === 'whatsapp' && <WhatsAppPage status={status} refresh={refresh} notify={notify} />}
+              {page === 'team' && <TeamPage status={status} onNavigate={navigate} notify={notify} />}
+              {page === 'agents' && <AgentsPage notify={notify} defaultModel={status.manager.defaultModel} />}
               {page === 'conversations' && <ConversationsPage notify={notify} />}
-              {page === 'playground' && <PlaygroundPage notify={notify} botName={status.agent.botName} />}
               {page === 'knowledge' && <KnowledgePage notify={notify} />}
               {page === 'mcp' && <McpPage notify={notify} />}
               {page === 'settings' && <SettingsPage notify={notify} refreshStatus={refresh} />}
