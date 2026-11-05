@@ -1,0 +1,71 @@
+{
+  "name": "whatsapp-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A self-hosted WhatsApp AI agent with OpenRouter, MCP tools, and local RAG.",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "node --watch --watch-path=./src --import tsx src/index.ts",
+    "dev:web": "npm run dev",
+    "dev:client": "vite --config web/vite.config.ts",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc -p tsconfig.build.json",
+    "build:web": "vite build --config web/vite.config.ts",
+    "start": "node dist/index.js",
+    "tui": "tsx src/tui.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p web/tsconfig.json --noEmit",
+    "setup": "tsx scripts/setup.ts"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@radix-ui/react-checkbox": "^1.1.2",
+    "@radix-ui/react-select": "^2.1.2",
+    "@whiskeysockets/baileys": "^6.7.24",
+    "autoprefixer": "^10.6.1",
+    "clsx": "^2.1.1",
+    "cookie-parser": "^1.4.7",
+    "croner": "^9.1.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.3.0",
+    "lucide-react": "^0.468.0",
+    "mammoth": "^1.12.0",
+    "multer": "^2.0.2",
+    "openai": "^7.43.0",
+    "pino": "^10.1.0",
+    "postcss": "^8.5.31",
+    "qrcode": "^1.5.4",
+    "string-argv": "^0.3.2",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^3.4.17",
+    "unpdf": "^1.9.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^10.0.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5"
+  },
+  "allowScripts": {
+    "@whiskeysockets/baileys@6.7.24": true,
+    "esbuild@0.28.2": true,
+    "onnxruntime-node@1.30.0": true,
+    "protobufjs@7.6.6": true
+  }
+}

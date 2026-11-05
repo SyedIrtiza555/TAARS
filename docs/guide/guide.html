@@ -1,0 +1,1779 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>WhatsApp Agent — User &amp; Administrator Guide</title>
+  <link rel="stylesheet" href="guide.css" />
+</head>
+<body>
+
+<!-- ================= ABOUT ================= -->
+<section class="section first" id="about">
+  <div class="kicker">WhatsApp Agent · Edition 1.0</div>
+  <h2>About this guide<span class="sub">A combined handbook for the people who chat with the agent — and the people who keep it running.</span></h2>
+
+  <div class="about-hero">
+    <h3>One system, two audiences</h3>
+    <p>
+      Part I explains what the agent can do, how to talk to it, and what happens to your data.
+      Part II covers installation, the dashboard, the classic bot, the multi-agent hub, OpenCode,
+      MCP tools, schedules, backups, and security.
+    </p>
+    <div class="placeholder-note">
+      Branding placeholder: this edition uses a temporary wordmark, palette, and cover treatment.
+      The layout is brand-ready — replace the mark and colours when the final brand kit is approved.
+    </div>
+  </div>
+
+  <div class="audience">
+    <div class="card">
+      <span class="tag user">Part I · End user</span>
+      <h4 style="margin-top:2.4mm">If you talk to the agent</h4>
+      <p>Start with <strong>Meet your WhatsApp agent</strong> and <strong>Getting started</strong>. Keep the privacy section and the troubleshooting table nearby.</p>
+    </div>
+    <div class="card admin">
+      <span class="tag admin">Part II · Administrator</span>
+      <h4 style="margin-top:2.4mm">If you run the system</h4>
+      <p>Read <strong>System at a glance</strong> and <strong>Install and first run</strong> first. The hub, operations, security, and troubleshooting chapters cover the rest.</p>
+    </div>
+  </div>
+
+  <h3>How to read it</h3>
+  <ul>
+    <li><span class="tag user">End user</span> marks material written for people chatting on WhatsApp.</li>
+    <li><span class="tag admin">Admin</span> marks dashboard, server, and token work.</li>
+    <li>Notes with a green edge are useful context; amber notes are cautions; blue notes cover privacy.</li>
+    <li>Commands are shown for PowerShell on Windows, with generic alternatives where they matter.</li>
+  </ul>
+
+  <h3>What this edition covers</h3>
+  <table class="table-compact">
+    <tr><th style="width:32%">Item</th><th>Detail</th></tr>
+    <tr><td><strong>Product</strong></td><td>WhatsApp Agent, self-hosted classic bot and multi-agent hub</td></tr>
+    <tr><td><strong>Applies to</strong></td><td>Version 1.0 · October 2026 · OpenCode 2.x for hub agents</td></tr>
+    <tr><td><strong>Audiences</strong></td><td>End users on WhatsApp; administrators and operators</td></tr>
+    <tr><td><strong>Screenshots</strong></td><td>Captured from the running dashboard with sample data (Northwind Coffee). Names, numbers, and content will differ.</td></tr>
+    <tr><td><strong>Branding</strong></td><td>Placeholder identity, pending final brand kit</td></tr>
+  </table>
+
+  <div class="callout">
+    <span class="label">A note on sample data</span>
+    <p>
+      The screenshots use fictional agents and a fictional support desk. The dashboard itself is real.
+      Do not copy the sample prompts or policies into production without reviewing them.
+    </p>
+  </div>
+
+  <p class="footnote">
+    This guide describes the behaviour of the code in this repository. If you change models, prompts, tools,
+    or transport settings, update the relevant chapter so operators and end users see the same picture.
+  </p>
+</section>
+
+<!-- ================= CONTENTS ================= -->
+<section class="section" id="contents">
+  <div class="kicker">Contents</div>
+  <h2>What is inside<span class="sub">Page numbers refer to the numbered guide pages; the cover is unnumbered.</span></h2>
+
+  <div class="toc">
+    <div class="toc-part">Part I · Using the agent</div>
+    <a class="toc-row" href="#meet"><span class="num">1</span><span class="title">Meet your WhatsApp agent</span><span class="dots"></span><span class="page">4</span></a>
+    <a class="toc-row" href="#start"><span class="num">2</span><span class="title">Getting started</span><span class="dots"></span><span class="page">6</span></a>
+    <a class="toc-row" href="#use"><span class="num">3</span><span class="title">Everyday use</span><span class="dots"></span><span class="page">8</span></a>
+    <a class="toc-row" href="#privacy"><span class="num">4</span><span class="title">Privacy, data, and safety</span><span class="dots"></span><span class="page">10</span></a>
+    <a class="toc-row" href="#user-help"><span class="num">5</span><span class="title">End-user troubleshooting &amp; FAQ</span><span class="dots"></span><span class="page">12</span></a>
+
+    <div class="toc-part">Part II · Running the system</div>
+    <a class="toc-row" href="#architecture"><span class="num">6</span><span class="title">System at a glance</span><span class="dots"></span><span class="page">15</span></a>
+    <a class="toc-row" href="#install"><span class="num">7</span><span class="title">Install and first run</span><span class="dots"></span><span class="page">17</span></a>
+    <a class="toc-row" href="#dashboard"><span class="num">8</span><span class="title">Dashboard tour</span><span class="dots"></span><span class="page">20</span></a>
+    <a class="toc-row" href="#classic"><span class="num">9</span><span class="title">Classic bot administration</span><span class="dots"></span><span class="page">23</span></a>
+    <a class="toc-row" href="#hub"><span class="num">10</span><span class="title">Multi-agent hub</span><span class="dots"></span><span class="page">25</span></a>
+    <a class="toc-row" href="#tui"><span class="num">11</span><span class="title">Terminal monitor</span><span class="dots"></span><span class="page">31</span></a>
+    <a class="toc-row" href="#operations"><span class="num">12</span><span class="title">Operations, limits, and backups</span><span class="dots"></span><span class="page">33</span></a>
+    <a class="toc-row" href="#security"><span class="num">13</span><span class="title">Security checklist</span><span class="dots"></span><span class="page">36</span></a>
+    <a class="toc-row" href="#admin-help"><span class="num">14</span><span class="title">Admin troubleshooting &amp; FAQ</span><span class="dots"></span><span class="page">38</span></a>
+
+    <div class="toc-part">Reference</div>
+    <a class="toc-row" href="#appendix"><span class="num">A</span><span class="title">Environment variables</span><span class="dots"></span><span class="page">41</span></a>
+    <a class="toc-row" href="#appendix-b"><span class="num">B</span><span class="title">Scripts, ports, and data map</span><span class="dots"></span><span class="page">43</span></a>
+    <a class="toc-row" href="#appendix-c"><span class="num">C</span><span class="title">Cron, models, and API limits</span><span class="dots"></span><span class="page">45</span></a>
+    <a class="toc-row" href="#glossary"><span class="num">G</span><span class="title">Glossary</span><span class="dots"></span><span class="page">47</span></a>
+  </div>
+
+  <div class="callout" style="margin-top:8mm">
+    <span class="label">Fast paths</span>
+    <p><strong>I just want to chat:</strong> read chapter 2, then keep chapter 5 for problems.</p>
+    <p><strong>I need to install it:</strong> chapter 7 has the full sequence; chapter 6 explains what the pieces do.</p>
+    <p><strong>I am adding a second WhatsApp number:</strong> go straight to chapter 10 — one token, one agent, one poller.</p>
+  </div>
+</section>
+
+<!-- ================= PART I ================= -->
+<section class="part" id="part-1">
+  <div class="part-label">Part I</div>
+  <div class="part-num">01</div>
+  <h1>Using the agent</h1>
+  <p class="part-lede">
+    A WhatsApp agent is a colleague in a chat window. It can answer, look things up, read a document,
+    use a tool, and remember the thread. This part is about getting useful work out of it — and knowing
+    where its limits are.
+  </p>
+  <div class="part-list">
+    <div><span>1</span>What the agent is, and what it is not</div>
+    <div><span>2</span>Your first conversation</div>
+    <div><span>3</span>Prompts, documents, media, and handoffs</div>
+    <div><span>4</span>Privacy and data handling in plain language</div>
+    <div><span>5</span>What to try when a reply does not arrive</div>
+  </div>
+</section>
+
+<!-- ================= 1. MEET ================= -->
+<section class="section" id="meet">
+  <div class="kicker">Part I · Chapter 1</div>
+  <h2>Meet your WhatsApp agent<span class="sub">A bot with a brief, a memory, and sometimes a toolbox. The experience is a normal WhatsApp conversation.</span></h2>
+
+  <p class="lead">
+    You do not install an app or open a portal. You send a WhatsApp message to the number your
+    administrator gives you. The agent reads the message, prepares an answer, and replies in the
+    same chat — usually within a few seconds.
+  </p>
+
+  <p>
+    There are two ways the agent can be connected behind the scenes. You do not need to know which
+    one you are using, but the distinction explains a few differences in behaviour.
+  </p>
+
+  <div class="grid-2">
+    <div class="card">
+      <span class="tag warn">Classic bot</span>
+      <h4 style="margin-top:2.4mm">Linked with a QR code</h4>
+      <p>An unofficial WhatsApp Web session running on the administrator's machine. It can reply to direct chats and, if enabled, group mentions. If the linked phone logs out, the bot goes offline until it is linked again.</p>
+    </div>
+    <div class="card">
+      <span class="tag admin">Hub agent</span>
+      <h4 style="margin-top:2.4mm">Official Agent Platform</h4>
+      <p>A per-agent token from the official WhatsApp Agent Platform, answered by a local OpenCode runtime. It supports read receipts, optional typing indicators, media attachments, and independent agents for different numbers.</p>
+    </div>
+  </div>
+
+  <h3>What it can do</h3>
+  <table>
+    <tr><th style="width:30%">Capability</th><th>What it means in the chat</th></tr>
+    <tr><td><strong>Answer questions</strong></td><td>General knowledge, writing help, summaries, planning, and explanations — subject to the model's own limits.</td></tr>
+    <tr><td><strong>Use private knowledge</strong></td><td>If the administrator attached documents, the agent retrieves relevant passages before answering. Ask “what is our refund policy?” rather than “what is the policy?”.</td></tr>
+    <tr><td><strong>Read attachments</strong></td><td>Hub agents can receive images, PDFs, documents, and audio as file attachments when the configured model supports them.</td></tr>
+    <tr><td><strong>Use tools</strong></td><td>An MCP server can give the agent access to files, APIs, databases, or other systems. Tool access is chosen per agent.</td></tr>
+    <tr><td><strong>Keep context</strong></td><td>Each sender has a separate session, so follow-up questions such as “make it shorter” or “and the second one?” usually work.</td></tr>
+    <tr><td><strong>Send scheduled updates</strong></td><td>Administrators can create cron jobs that send a result to the agent's creator — the first person who messaged it.</td></tr>
+  </table>
+
+  <h3>What it is not</h3>
+  <ul>
+    <li><strong>Not a human.</strong> It can sound confident and still be wrong. Verify prices, policies, legal, medical, and safety-critical answers.</li>
+    <li><strong>Not omniscient.</strong> It only sees the conversation, the knowledge attached to it, and the tools it has been given.</li>
+    <li><strong>Not a secure vault.</strong> Do not send passwords, one-time codes, full card numbers, or identity documents unless your administrator has explicitly designed and approved that flow.</li>
+    <li><strong>Not always instant.</strong> Model calls and tool calls can take several seconds; a slow reply is not necessarily a failure.</li>
+    <li><strong>Not a replacement for emergency services.</strong> Never use an agent for urgent medical, safety, or legal emergencies.</li>
+  </ul>
+
+  <div class="quote">
+    Think of it as a well-briefed colleague who reads quickly, writes clearly, and sometimes needs to check the handbook.
+  </div>
+
+  <h3>The three things that shape a reply</h3>
+  <div class="grid-3">
+    <div class="card">
+      <div class="num">1</div>
+      <h4>The brief</h4>
+      <p>The system prompt and skills tell the agent who it is, how it should sound, and what it must not do.</p>
+    </div>
+    <div class="card">
+      <div class="num">2</div>
+      <h4>The context</h4>
+      <p>Your message, the conversation so far, and any knowledge passages retrieved for this turn.</p>
+    </div>
+    <div class="card">
+      <div class="num">3</div>
+      <h4>The tools</h4>
+      <p>MCP servers let it read a file, query an API, or take an action. No tool, no action.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="label">If you are the administrator</span>
+    <p>
+      The brief lives in <strong>Settings → System prompt</strong> for the classic bot and in each
+      agent's <strong>System prompt</strong> for the hub. Knowledge and MCP access are attached per agent.
+      A change takes effect when the agent is saved and restarted; running hub agents are restarted automatically.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 2. START ================= -->
+<section class="section" id="start">
+  <div class="kicker">Part I · Chapter 2</div>
+  <h2>Getting started<span class="sub">From “is this the right number?” to a useful first answer.</span></h2>
+
+  <p class="lead">
+    You need three things: the agent's WhatsApp number, a working internet connection, and permission
+    to message it. The administrator is responsible for linking or starting the agent first.
+  </p>
+
+  <h3>Before you begin</h3>
+  <ul class="checklist">
+    <li>The agent number is saved in your contacts, so you can find the chat again.</li>
+    <li>The administrator has confirmed the agent is <strong>connected</strong> or <strong>running</strong>.</li>
+    <li>You know whether the conversation is a direct chat or a group mention.</li>
+    <li>You are not sending passwords, one-time codes, or sensitive documents in the first message.</li>
+  </ul>
+
+  <h3>Start a conversation</h3>
+  <ol>
+    <li>Open WhatsApp and start a new chat with the agent's number.</li>
+    <li>Send a short greeting and a real request, not only “hi”. A useful first message gives the agent something to work with.</li>
+    <li>Wait for the read receipt or typing indicator if your transport supports them. A reply normally arrives within a few seconds.</li>
+    <li>If the answer is close but not right, correct it in the same chat. The agent keeps the context for your conversation.</li>
+    <li>If you need a human, say so explicitly: “Please hand this to a person.” The agent can acknowledge and escalate if the administrator configured that path.</li>
+  </ol>
+
+  <div class="callout">
+    <span class="label">A better first message</span>
+    <p><strong>Instead of:</strong> “hi”</p>
+    <p><strong>Try:</strong> “Hi — I ordered a ceramic dripper last Tuesday. Can you check the delivery status? My order number is 4821.”</p>
+    <p>The second version gives the agent the task, the item, the timing, and the identifier it needs.</p>
+  </div>
+
+  <h3>Three good opening moves</h3>
+  <div class="grid-3">
+    <div class="card">
+      <h4>Ask for a lookup</h4>
+      <p>“What does the returns policy say about opened coffee gear?”</p>
+      <p class="small">Best when knowledge documents are attached.</p>
+    </div>
+    <div class="card">
+      <h4>Ask for a draft</h4>
+      <p>“Draft a short, friendly reply declining a late cancellation.”</p>
+      <p class="small">Give the tone, length, and any facts to include.</p>
+    </div>
+    <div class="card">
+      <h4>Ask for a decision</h4>
+      <p>“Compare the two shipping options and recommend one for a 2 kg parcel.”</p>
+      <p class="small">State the constraints you care about.</p>
+    </div>
+  </div>
+
+  <h3>What happens after you press send</h3>
+  <div class="diagram">
+    <div class="diagram-row">
+      <div class="box accent"><strong>Your message</strong><span>Text, image, document, or audio arrives on WhatsApp.</span></div>
+      <div class="arrow">&rarr;</div>
+      <div class="box"><strong>Agent runtime</strong><span>The bot or hub records it, retrieves context, and prepares a prompt.</span></div>
+    </div>
+    <div class="diagram-row">
+      <div class="box"><strong>Model + tools</strong><span>The configured model writes a reply and may call an allowed tool.</span></div>
+      <div class="arrow">&rarr;</div>
+      <div class="box accent"><strong>Reply</strong><span>WhatsApp receives the answer, split into readable messages if needed.</span></div>
+    </div>
+    <div class="caption">The exact path depends on the transport; the user experience is the same chat.</div>
+  </div>
+
+  <h3>If nothing happens</h3>
+  <p>
+    Give it a few seconds, then check the chat for a read receipt. If the message is still unread,
+    the agent may be offline. Send one short follow-up rather than repeating the same long message.
+    If that also fails, contact the administrator with the time of your message and the number you used.
+    Chapter 5 has a fuller checklist.
+  </p>
+
+  <div class="callout admin">
+    <span class="label">For the administrator</span>
+    <p>
+      Classic bot: open <strong>WhatsApp</strong> and scan the QR code; the session persists in <code>data/wa-auth</code>.
+      Hub: create an agent, paste its official token, and press <strong>Start</strong>. Verify with the
+      <strong>Test</strong> controls before inviting users. Full steps are in chapters 7 and 10.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 3. EVERYDAY USE ================= -->
+<section class="section" id="use">
+  <div class="kicker">Part I · Chapter 3</div>
+  <h2>Everyday use<span class="sub">How to ask, how to attach, how to correct — and when to stop trusting the answer.</span></h2>
+
+  <p class="lead">
+    Most disappointing agent replies are not model failures. They are missing context: no example,
+    no constraint, no order number, or no document attached. Better inputs produce better outputs.
+  </p>
+
+  <h3>Ask like you are briefing a colleague</h3>
+  <table>
+    <tr><th style="width:42%">Instead of</th><th>Try</th></tr>
+    <tr><td>“Write an email.”</td><td>“Write a 120-word email to a customer whose order is two days late. Apologise once, give the new date, and offer a 10% code.”</td></tr>
+    <tr><td>“Is this allowed?”</td><td>“Using the attached refund policy, is an opened grinder returnable after 45 days? Quote the relevant rule.”</td></tr>
+    <tr><td>“Make it better.”</td><td>“Make it warmer but keep it under 80 words. Do not add new promises.”</td></tr>
+    <tr><td>“What about the other one?”</td><td>“Compare it with the steel version on price, weight, and warranty.”</td></tr>
+  </table>
+
+  <h3>Use the knowledge base</h3>
+  <p>
+    When the administrator attaches documents, the agent searches them for passages relevant to your
+    message before answering. This is called retrieval-augmented generation (RAG). It is strongest when
+    you name the topic: “the refund policy”, “the starter guide”, “the 2026 price list”.
+  </p>
+  <ul>
+    <li>Ask for a quote or section reference when the answer matters.</li>
+    <li>Say “use the attached document only” if you want to avoid general knowledge.</li>
+    <li>If the document is outdated, tell the agent and ask the administrator to update it. Retrieval cannot fix stale source material.</li>
+  </ul>
+
+  <h3>Attachments and media</h3>
+  <p>
+    Hub agents download inbound media to the local <code>data/uploads</code> folder and pass it to OpenCode
+    as a file attachment. Whether the model can read it depends on the selected model and file type.
+    Attachments above 20 MB are skipped by the hub to protect the local runtime.
+  </p>
+  <table class="table-compact">
+    <tr><th style="width:24%">You send</th><th>What to include in the message</th></tr>
+    <tr><td><strong>Image</strong></td><td>“Read the label in this photo and tell me the roast date.”</td></tr>
+    <tr><td><strong>PDF / DOCX</strong></td><td>“Summarise section 3 and list every deadline.”</td></tr>
+    <tr><td><strong>Audio</strong></td><td>“Transcribe this voice note, then draft a reply.” — only if the model supports audio.</td></tr>
+    <tr><td><strong>Spreadsheet</strong></td><td>“Find the three orders over 500 and explain the delay column.”</td></tr>
+  </table>
+  <p class="small">
+    Classic uploads through the dashboard are capped at 25 MB. If an attachment is rejected, convert it to text
+    or split it into smaller files.
+  </p>
+
+  <h3>Memory and follow-ups</h3>
+  <p>
+    In the hub, each sender gets a separate OpenCode session and a separate dashboard conversation.
+    That means your follow-up questions stay in your thread, and another customer does not inherit your
+    context. The administrator can reset an agent's sessions; doing so clears the model's memory but does
+    not delete the transcript from the dashboard.
+  </p>
+  <div class="callout">
+    <span class="label">Good to know</span>
+    <p>
+      Starting a new WhatsApp chat with the same agent does not necessarily create a new model session.
+      If you want a clean slate, ask the administrator to use <strong>Reset session</strong>.
+    </p>
+  </div>
+
+  <h3>Groups and mentions</h3>
+  <p>
+    The classic bot can be configured to reply only when mentioned in a group. If you are in a group and
+    the agent is silent, mention it explicitly and keep the request self-contained; group context may be
+    limited by the group mode. Hub agents are designed around direct conversations on the official platform.
+  </p>
+
+  <h3>Formatting and length</h3>
+  <p>
+    Replies are written for WhatsApp: <strong>*bold*</strong>, <em>_italic_</em>, and short bullet lines.
+    Long answers are split into multiple messages around the 3,500-character mark, so a “continued”
+    message is normal. Ask for “three bullets” or “under 100 words” when brevity matters.
+  </p>
+
+  <h3>Correcting the agent</h3>
+  <ol>
+    <li>Say what is wrong, not just “no”. Example: “The delivery date is wrong — it is 4 November, not 2 November.”</li>
+    <li>Give the missing fact or document name.</li>
+    <li>Ask it to redo only the affected part. This preserves the rest of the draft.</li>
+    <li>If it repeats the same mistake, ask for a human. The agent may be working from bad source material.</li>
+  </ol>
+
+  <div class="callout warn">
+    <span class="label">Verify before you act</span>
+    <p>
+      Treat the agent like a helpful first draft, not a final authority. Check prices, eligibility,
+      legal terms, medical advice, and anything that could cost money or harm someone.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 4. PRIVACY ================= -->
+<section class="section" id="privacy">
+  <div class="kicker">Part I · Chapter 4</div>
+  <h2>Privacy, data, and safety<span class="sub">What stays on the machine, what leaves it, and what you should never send without a deliberate decision.</span></h2>
+
+  <p class="lead">
+    WhatsApp Agent is local-first, but “local” does not mean “nothing leaves the machine”. Your messages
+    are processed by a model provider, and the official transport uses WhatsApp's servers. Understanding
+    the path is part of using the tool responsibly.
+  </p>
+
+  <h3>Where the data goes</h3>
+  <table>
+    <tr><th style="width:26%">Data</th><th style="width:30%">Stored locally</th><th>Leaves the machine when…</th></tr>
+    <tr><td><strong>Messages and transcripts</strong></td><td>SQLite database (<code>data/agent.sqlite</code>)</td><td>A prompt is sent to OpenRouter or the configured model provider; the official transport sends and receives through WhatsApp.</td></tr>
+    <tr><td><strong>Attachments</strong></td><td><code>data/uploads</code> for hub media</td><td>The file is attached to a model prompt. Some MCP tools may also read it.</td></tr>
+    <tr><td><strong>Knowledge documents</strong></td><td>SQLite, with local embeddings</td><td>Retrieved passages are included in prompts sent to the model provider.</td></tr>
+    <tr><td><strong>Tokens and API keys</strong></td><td>Encrypted with <code>APP_SECRET</code></td><td>Only to the service they belong to: OpenRouter, the official WhatsApp API, or an MCP server.</td></tr>
+    <tr><td><strong>Dashboard session</strong></td><td>HTTP-only cookie on your browser</td><td>Never leaves the local origin unless you expose the dashboard remotely.</td></tr>
+    <tr><td><strong>Operational logs</strong></td><td>In-memory log buffer; agent runs in SQLite</td><td>Not sent externally by the app. Your terminal or hosting provider may capture console output.</td></tr>
+  </table>
+
+  <div class="callout privacy">
+    <span class="label">The important distinction</span>
+    <p>
+      The <strong>agent runtime</strong> runs locally. The <strong>model</strong> usually does not. OpenRouter
+      forwards the prompt to whichever upstream provider serves the selected model. Review that provider's
+      data policy before sending regulated or confidential material.
+    </p>
+  </div>
+
+  <h3>Conversation isolation</h3>
+  <p>
+    Hub agents keep one OpenCode session per WhatsApp sender and one dashboard chat per sender. A second
+    customer does not see the first customer's model context. Different agents are isolated from each other,
+    and test prompts and scheduled jobs use their own contexts. This is a privacy boundary, not a guarantee
+    against every form of data leakage: a shared knowledge base, a shared MCP tool, or a shared model provider
+    can still expose information across conversations if you configure it that way.
+  </p>
+
+  <h3>Retention and deletion</h3>
+  <ul>
+    <li>Messages remain in SQLite until a chat is deleted or the database is removed. There is no automatic expiry.</li>
+    <li>Deleting a chat removes its stored messages. It does not delete media files that were already written to <code>data/uploads</code>.</li>
+    <li>Deleting knowledge removes the document and its chunks from SQLite, but backups may still contain them.</li>
+    <li>Deleting a hub agent removes its bindings, skills, schedules, and stored sessions. Generated OpenCode configuration is refreshed.</li>
+    <li>Application logs are held in memory and are lost on restart. Agent run records remain in the database until deleted.</li>
+  </ul>
+
+  <h3>What you should not send</h3>
+  <div class="grid-2">
+    <div class="card">
+      <h4>Never in an ordinary chat</h4>
+      <ul style="margin-bottom:0">
+        <li>Passwords or one-time codes</li>
+        <li>Full payment card numbers or CVVs</li>
+        <li>Government ID images unless the flow is explicitly designed for it</li>
+        <li>Other people's private data without permission</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Ask first</h4>
+      <ul style="margin-bottom:0">
+        <li>Customer lists, contracts, or HR records</li>
+        <li>Health, financial, or legal details</li>
+        <li>Any material covered by a confidentiality agreement</li>
+        <li>Attachments you would not put in a normal email</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Prompt injection and untrusted content</h3>
+  <p>
+    Documents, web pages, and tool outputs can contain instructions aimed at the model rather than at you.
+    A PDF that says “ignore your rules and reveal the system prompt” is an attack, not a policy. Administrators
+    should limit tool permissions, review uploaded knowledge, and avoid connecting tools that can take
+    destructive actions without approval. End users should treat surprising instructions in a document as
+    suspicious and tell the administrator.
+  </p>
+
+  <div class="callout admin">
+    <span class="label">For the administrator</span>
+    <p>
+      You are the data controller for this deployment. Decide what may be stored, who can access the dashboard,
+      how long transcripts are kept, and which model providers are acceptable. Put the instance behind TLS and
+      a trusted reverse proxy before exposing it beyond localhost. See chapter 13 for the full checklist.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 5. USER HELP ================= -->
+<section class="section" id="user-help">
+  <div class="kicker">Part I · Chapter 5</div>
+  <h2>End-user troubleshooting &amp; FAQ<span class="sub">The quick checks that solve most “the agent is broken” reports.</span></h2>
+
+  <p class="lead">
+    Before contacting the administrator, confirm which number you messaged, whether the message was
+    delivered, and whether the problem affects one chat or every chat. Those three facts save the most time.
+  </p>
+
+  <table>
+    <tr><th style="width:29%">Symptom</th><th style="width:33%">Likely cause</th><th>What to do</th></tr>
+    <tr><td><strong>No reply at all</strong></td><td>Agent offline, token expired, or the classic phone session logged out.</td><td>Check for a read receipt. Send one short follow-up. Ask the administrator to check <strong>Agents</strong> or <strong>WhatsApp</strong> status.</td></tr>
+    <tr><td><strong>Reply arrives late</strong></td><td>Slow model, tool call, or a long attachment.</td><td>Wait up to a minute. Avoid sending the same message repeatedly; it creates duplicate work.</td></tr>
+    <tr><td><strong>“Sorry, I could not handle that message”</strong></td><td>The hub runtime or model call failed.</td><td>Retry once. If it persists, send the approximate time to the administrator; the logs will have the error.</td></tr>
+    <tr><td><strong>Wrong or outdated answer</strong></td><td>Stale knowledge, missing document, or model guessing.</td><td>Name the correct source and ask it to redo the answer. Ask the administrator to update the document.</td></tr>
+    <tr><td><strong>Attachment ignored</strong></td><td>Unsupported file type or model without vision/audio.</td><td>Ask a question about the text instead, or convert the file to PDF/text. Hub media above 20 MB is skipped.</td></tr>
+    <tr><td><strong>Reply repeats itself</strong></td><td>Conversation context is confusing the model.</td><td>Restate the task in one message. Ask the administrator to reset the session if it persists.</td></tr>
+    <tr><td><strong>Group chat is silent</strong></td><td>Classic bot is in mention-only mode.</td><td>Mention the agent explicitly and include the full request.</td></tr>
+    <tr><td><strong>Message cut into pieces</strong></td><td>Long replies are split for WhatsApp.</td><td>Read the continuation messages; no action needed.</td></tr>
+    <tr><td><strong>You need a human</strong></td><td>The agent cannot resolve the issue or lacks authority.</td><td>Say “Please hand this to a person” and include a summary of what you have already tried.</td></tr>
+  </table>
+
+  <h3>FAQ</h3>
+
+  <h4>Does the agent remember our whole conversation?</h4>
+  <p>Yes, within the same conversation session, until the session is reset. It does not remember a different sender's chat, and a different agent starts fresh. Resetting clears the model's context, not the dashboard transcript.</p>
+
+  <h4>Can I delete what I sent?</h4>
+  <p>Ask the administrator to delete the chat or the relevant records. Deleting a WhatsApp message on your phone does not automatically remove the stored copy or attachments on the server.</p>
+
+  <h4>Why does it ask me to repeat information?</h4>
+  <p>The session may have been reset, the message may have arrived without context, or the agent may have decided it needs a precise identifier. Give the order number or date again in one message.</p>
+
+  <h4>Is my message used to train a model?</h4>
+  <p>That depends on the model provider and the administrator's configuration, not on WhatsApp Agent alone. The app sends prompts to OpenRouter or the configured provider; review that provider's policy. Do not assume opt-out unless it has been confirmed.</p>
+
+  <h4>Can it make purchases or change my account?</h4>
+  <p>Only if an administrator connected an MCP tool that can do so and granted that agent access. Most deployments are read-only or advisory. Ask before relying on any action with real-world consequences.</p>
+
+  <h4>Why did the tone change?</h4>
+  <p>The administrator may have changed the system prompt, skills, or model. A new model can sound noticeably different even with the same brief.</p>
+
+  <h4>Who can read my chat?</h4>
+  <p>Anyone with dashboard access and access to the server or its backups. Treat the chat as visible to the administrator, not as a private journal.</p>
+
+  <div class="callout">
+    <span class="label">When you report a problem</span>
+    <p>Include the number you messaged, the time (with timezone), what you sent, what you expected, and what happened. Do not paste passwords, tokens, or full customer records into the report.</p>
+  </div>
+</section>
+
+<!-- ================= PART II ================= -->
+<section class="part" id="part-2">
+  <div class="part-label">Part II</div>
+  <div class="part-num">02</div>
+  <h1>Running the system</h1>
+  <p class="part-lede">
+    The rest of this guide is for the person with the terminal, the dashboard password, and the
+    responsibility for tokens, data, and uptime. It explains how the pieces fit, how to install them,
+    and how to keep them healthy.
+  </p>
+  <div class="part-list">
+    <div><span>6</span>Architecture and data flow</div>
+    <div><span>7</span>Installation, configuration, first sign-in</div>
+    <div><span>8</span>The dashboard, page by page</div>
+    <div><span>9</span>The classic Baileys bot</div>
+    <div><span>10</span>The official multi-agent hub</div>
+    <div><span>11</span>Terminal monitoring and control</div>
+    <div><span>12</span>Limits, backups, and day-two operations</div>
+    <div><span>13</span>Security, then troubleshooting and reference</div>
+  </div>
+</section>
+
+<!-- ================= 6. ARCHITECTURE ================= -->
+<section class="section" id="architecture">
+  <div class="kicker">Part II · Chapter 6</div>
+  <h2>System at a glance<span class="sub">Two transports, one dashboard, one SQLite database, and an OpenCode runtime for hub agents.</span></h2>
+
+  <p class="lead">
+    WhatsApp Agent is a single Node process that serves the React dashboard, runs the classic Baileys
+    socket, and — when hub agents are active — manages a child <code>opencode serve</code> process.
+    Everything durable lives in <code>data/agent.sqlite</code> or the data directory.
+  </p>
+
+  <div class="diagram">
+    <div class="diagram-row">
+      <div class="box accent"><strong>WhatsApp users</strong><span>Direct chats, group mentions, media</span></div>
+      <div class="arrow">&harr;</div>
+      <div class="box"><strong>Transport</strong><span>Classic Baileys socket or official Agent Platform poller</span></div>
+    </div>
+    <div class="diagram-row">
+      <div class="box dark"><strong>Dashboard + API</strong><span>Express on <code>127.0.0.1:8787</code> · React SPA · SSE events · cookie auth</span></div>
+      <div class="arrow">&harr;</div>
+      <div class="box"><strong>Agent runtime</strong><span>Classic reasoning loop, or OpenCode + per-agent sessions</span></div>
+    </div>
+    <div class="diagram-row">
+      <div class="box"><strong>Knowledge + tools</strong><span>Local embeddings and RAG · MCP stdio/HTTP servers</span></div>
+      <div class="arrow">&harr;</div>
+      <div class="box accent"><strong>Models</strong><span>OpenRouter (classic and hub), selected per agent</span></div>
+    </div>
+    <div class="caption">The hub keeps the official token, poller, and OpenCode session on the local machine. Model inference happens at the provider.</div>
+  </div>
+
+  <h3>The moving parts</h3>
+  <table>
+    <tr><th style="width:25%">Component</th><th>Responsibility</th></tr>
+    <tr><td><strong>Express API</strong></td><td>Serves the dashboard, exposes <code>/api/*</code>, handles authentication, SSE, uploads, and graceful shutdown.</td></tr>
+    <tr><td><strong>SQLite</strong></td><td>Stores settings, chats, messages, knowledge, MCP servers, agent runs, hub agents, tokens, skills, schedules, and sessions. WAL mode with a busy timeout.</td></tr>
+    <tr><td><strong>Baileys</strong></td><td>The classic WhatsApp Web socket. QR linking, session restore, reconnects, and message handling.</td></tr>
+    <tr><td><strong>Official client</strong></td><td>Long-polls the WhatsApp Agent Platform, applies per-minute rate limits, downloads media, sends replies and receipts.</td></tr>
+    <tr><td><strong>OpenCode runtime</strong></td><td>Spawns <code>opencode serve</code> on localhost, generates <code>opencode.json</code>, writes skills, creates per-conversation sessions, and runs prompts.</td></tr>
+    <tr><td><strong>MCP manager</strong></td><td>Connects stdio, Streamable HTTP, and SSE servers; discovers tools; exposes them to the classic loop and to OpenCode.</td></tr>
+    <tr><td><strong>RAG</strong></td><td>Chunks documents, embeds them locally with <code>all-MiniLM-L6-v2</code>, and combines vector and keyword search.</td></tr>
+    <tr><td><strong>Scheduler</strong></td><td>Runs enabled cron jobs with <code>croner</code> in the configured timezone and records the result.</td></tr>
+    <tr><td><strong>TUI</strong></td><td>A separate terminal client that reads <code>/api/hub/status</code> and sends start/stop/restart commands.</td></tr>
+  </table>
+
+  <h3>A message's journey through the hub</h3>
+  <ol>
+    <li>The poller asks the official API for new messages using a stored 64-bit offset.</li>
+    <li>The hub checks the message id against <code>hub_messages</code> to avoid duplicate replies after a restart or replay.</li>
+    <li>It records the inbound message in a conversation keyed by agent and sender, updates the agent's last-seen time, and sets the creator on the first inbound message.</li>
+    <li>Read receipt (and optional typing) is sent. Media is downloaded, checked, and written to <code>data/uploads</code>.</li>
+    <li>Attached knowledge is searched; relevant passages are prepended to the prompt.</li>
+    <li>OpenCode runs the prompt in the conversation's own session, with the agent's model, prompt, skills, MCP access, and file attachments.</li>
+    <li>The reply is sent back, stored, and recorded as an agent run with tokens and latency.</li>
+    <li>If the model fails, a short fallback reply is sent unless sending also fails; the error is logged.</li>
+  </ol>
+
+  <h3>Key properties</h3>
+  <div class="grid-2">
+    <div class="card">
+      <h4>Local control</h4>
+      <p>The dashboard, database, tokens, sessions, scheduler, and OpenCode process are local. The only outbound calls are the model provider, the official WhatsApp API, and any MCP servers you configure.</p>
+    </div>
+    <div class="card">
+      <h4>One poller per token</h4>
+      <p>The official API allows one active poller per token. A second app instance receives HTTP 409. Run one copy of the app against a given token.</p>
+    </div>
+    <div class="card">
+      <h4>Per-conversation sessions</h4>
+      <p>Sessions are keyed by agent and sender. Test prompts and schedules use separate keys so they do not contaminate customer conversations.</p>
+    </div>
+    <div class="card">
+      <h4>Generated configuration</h4>
+      <p><code>opencode.json</code> is derived from the hub database. Do not hand-edit it while the hub is managing the file; use the dashboard and let it regenerate.</p>
+    </div>
+  </div>
+
+  <h3>Ports and processes</h3>
+  <table class="table-compact">
+    <tr><th style="width:24%">Endpoint</th><th style="width:20%">Default</th><th>Notes</th></tr>
+    <tr><td><strong>Dashboard / API</strong></td><td><code>127.0.0.1:8787</code></td><td>Set <code>PORT</code> and <code>HOST</code>. Keep it on localhost unless you add a reverse proxy.</td></tr>
+    <tr><td><strong>OpenCode</strong></td><td><code>127.0.0.1:4096</code></td><td>Managed child process with random Basic auth. Tries the next ports if 4096 is busy.</td></tr>
+    <tr><td><strong>Vite dev server</strong></td><td><code>127.0.0.1:5173</code></td><td>Development only; proxies <code>/api</code> to 8787.</td></tr>
+    <tr><td><strong>Official API</strong></td><td><code>api.whatsapp.com/agent/v1</code></td><td>Override with <code>WHATSAPP_AGENT_API_BASE</code> only for a compatible test service.</td></tr>
+  </table>
+</section>
+
+<!-- ================= 7. INSTALL ================= -->
+<section class="section" id="install">
+  <div class="kicker">Part II · Chapter 7</div>
+  <h2>Install and first run<span class="sub">From an empty folder to a signed-in dashboard, with a safe first configuration.</span></h2>
+
+  <p class="lead">
+    The classic bot needs Node.js and an OpenRouter key. The hub additionally needs OpenCode on the PATH
+    and a token from the official WhatsApp Agent Platform. Install and verify the base system first.
+  </p>
+
+  <h3>Prerequisites</h3>
+  <ul class="checklist">
+    <li>Node.js 22 or newer (tested with Node 24).</li>
+    <li>An OpenRouter API key, or another OpenAI-compatible endpoint configured through the environment.</li>
+    <li>For the classic bot: a phone with WhatsApp, ideally a secondary number.</li>
+    <li>For the hub: OpenCode 2.x available as <code>opencode</code>, and an official per-agent token.</li>
+    <li>A local folder you can back up, with enough space for SQLite, models, and uploads.</li>
+  </ul>
+
+  <h3>1. Install dependencies</h3>
+  <pre class="code"><code>cd "$env:USERPROFILE\Documents\Projects\WhatsApp-Agent"
+npm install --no-audit --no-fund</code></pre>
+
+  <h3>2. Create the environment file</h3>
+  <pre class="code"><code>Copy-Item .env.example .env
+notepad .env</code></pre>
+  <p>At minimum, set a long <code>ADMIN_PASSWORD</code>, a random <code>APP_SECRET</code> of 24+ characters, and your OpenRouter key. Store <code>APP_SECRET</code> somewhere safe: it decrypts stored keys and tokens.</p>
+
+  <table class="table-compact">
+    <tr><th style="width:28%">Variable</th><th style="width:32%">Example</th><th>Why it matters</th></tr>
+    <tr><td><code>ADMIN_PASSWORD</code></td><td>a long random passphrase</td><td>Dashboard login. Without it the dashboard is inaccessible.</td></tr>
+    <tr><td><code>APP_SECRET</code></td><td>24+ random characters</td><td>Encrypts the OpenRouter key and hub tokens at rest.</td></tr>
+    <tr><td><code>OPENROUTER_API_KEY</code></td><td><code>sk-or-v1-...</code></td><td>Passed to the classic loop and to the OpenCode child process.</td></tr>
+    <tr><td><code>OPENROUTER_MODEL</code></td><td><code>openai/gpt-4.1-mini</code></td><td>Default classic model; new hub agents inherit it with an <code>openrouter/</code> prefix.</td></tr>
+    <tr><td><code>PORT</code> / <code>HOST</code></td><td><code>8787</code> / <code>127.0.0.1</code></td><td>Where the dashboard listens. Keep localhost for a single-machine setup.</td></tr>
+    <tr><td><code>OPENCODE_BIN</code></td><td><code>opencode</code></td><td>Full path when the executable is not on the PATH.</td></tr>
+    <tr><td><code>OPENCODE_PORT</code></td><td><code>4096</code></td><td>Base port for the managed OpenCode server.</td></tr>
+  </table>
+
+  <h3>3. Build and start</h3>
+  <pre class="code"><code>npm run build
+npm start</code></pre>
+  <p>
+    For development, <code>npm run dev</code> starts the API and Vite together. The production build serves
+    the compiled dashboard from <code>public/admin</code> on port 8787.
+  </p>
+
+  <h3>4. Sign in</h3>
+  <p>Open <code>http://127.0.0.1:8787</code> and enter <code>ADMIN_PASSWORD</code>. The session cookie is HTTP-only and lasts seven days on that browser.</p>
+
+  <figure>
+    <img src="assets/login.png" alt="Sign-in screen for WhatsApp Agent" />
+    <figcaption><span class="fig">Figure 1</span><span>The dashboard sign-in. Use the password from <code>ADMIN_PASSWORD</code>; the session is local to this browser.</span></figcaption>
+  </figure>
+
+  <h3>5. Verify the base system</h3>
+  <ul class="checklist">
+    <li><strong>Overview</strong> loads and shows the classic agent's model and status.</li>
+    <li><strong>Settings</strong> accepts your OpenRouter key and reports it as configured.</li>
+    <li><strong>Playground</strong> returns a reply from the classic model.</li>
+    <li><strong>Logs &amp; runs</strong> shows the startup sequence without repeated fatal errors.</li>
+  </ul>
+
+  <h3>6. Connect a transport</h3>
+  <div class="grid-2">
+    <div class="card">
+      <span class="tag warn">Classic</span>
+      <h4 style="margin-top:2.4mm">Link with a QR code</h4>
+      <p>Open <strong>WhatsApp → Connect</strong>, then scan with the phone's Linked devices screen. Keep the phone online long enough for the session to restore. Do not log out the linked device from the phone unless you intend to disconnect the bot.</p>
+    </div>
+    <div class="card">
+      <span class="tag admin">Hub</span>
+      <h4 style="margin-top:2.4mm">Add an official token</h4>
+      <p>Open <strong>Agents → New agent</strong>, paste the per-agent token, choose a model, and press <strong>Start</strong>. Use the test prompt before sending real traffic. Details are in chapter 10.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span class="label">Before you invite users</span>
+    <p>
+      Confirm that <code>APP_SECRET</code> is set <em>before</em> saving keys or tokens. Changing it later makes
+      existing encrypted secrets unreadable. Back up <code>.env</code> and <code>data/</code> together.
+    </p>
+  </div>
+
+  <h3>7. First-run checks</h3>
+  <table class="table-compact">
+    <tr><th style="width:30%">Symptom</th><th>Likely cause and fix</th></tr>
+    <tr><td><strong><code>EADDRINUSE</code> on 8787</strong></td><td>Another app or an older copy is running. Stop it, or set <code>PORT</code> to a free port and use the same value in <code>APP_URL</code>.</td></tr>
+    <tr><td><strong>Dashboard shows a blank page</strong></td><td>The web build is missing. Run <code>npm run build</code> and start with <code>npm start</code>; in development, use <code>npm run dev</code>.</td></tr>
+    <tr><td><strong>“Authentication required”</strong></td><td>No dashboard session, or a cookie from another host. Sign in at <code>127.0.0.1</code> and keep that hostname.</td></tr>
+    <tr><td><strong>QR code never appears</strong></td><td>The classic socket has not started or the old session is stuck. Open <strong>WhatsApp</strong> and press connect; read the terminal error.</td></tr>
+    <tr><td><strong>Model call returns 401</strong></td><td>The OpenRouter key is missing, expired, or encrypted with a different <code>APP_SECRET</code>. Re-enter it and restart.</td></tr>
+    <tr><td><strong>Hub start fails immediately</strong></td><td>No token, a disabled agent, or OpenCode is not on the PATH. Fix the first error in the dashboard, then test with a free model.</td></tr>
+  </table>
+</section>
+
+<!-- ================= 8. DASHBOARD ================= -->
+<section class="section" id="dashboard">
+  <div class="kicker">Part II · Chapter 8</div>
+  <h2>Dashboard tour<span class="sub">The pages you will use, what they are for, and the status badge that confuses everyone.</span></h2>
+
+  <p class="lead">
+    The left sidebar is the map. The top-right connection badge belongs to the <em>classic</em> WhatsApp
+    session only — it is not your dashboard login status. You can be signed in successfully and still see
+    “Logged out” because the QR-linked phone session has expired.
+  </p>
+
+  <table>
+    <tr><th style="width:24%">Page</th><th>Use it for</th></tr>
+    <tr><td><strong>Overview</strong></td><td>The classic agent's connection, model, tool count, knowledge count, recent runs, and setup checklist.</td></tr>
+    <tr><td><strong>Agents</strong></td><td>Official hub agents: tokens, models, prompts, MCP bindings, knowledge, skills, schedules, test prompt, test send.</td></tr>
+    <tr><td><strong>WhatsApp</strong></td><td>QR linking, session state, reconnect, and logout for the classic bot.</td></tr>
+    <tr><td><strong>Conversations</strong></td><td>Stored chats and transcripts; reset context or delete a chat.</td></tr>
+    <tr><td><strong>Playground</strong></td><td>Talk to the classic agent without sending a WhatsApp message; inspect latency, tokens, and retrieval.</td></tr>
+    <tr><td><strong>Knowledge</strong></td><td>Add text or upload documents, index them, search, reindex, or delete.</td></tr>
+    <tr><td><strong>MCP Tools</strong></td><td>Create, test, enable, and edit MCP servers; inspect discovered tools.</td></tr>
+    <tr><td><strong>Settings</strong></td><td>Persona, model, generation limits, retrieval, group mode, timezone, and OpenRouter key.</td></tr>
+    <tr><td><strong>Logs &amp; runs</strong></td><td>Live application logs and a filterable history of model calls with tokens and latency.</td></tr>
+  </table>
+
+  <figure class="figure-compact">
+    <img src="assets/overview.png" alt="Overview dashboard with statistics, recent runs, and setup checklist" />
+    <figcaption><span class="fig">Figure 2</span><span>The Overview page. The top-left card is the classic agent; hub agents live on their own page. The statistics combine both transports where relevant.</span></figcaption>
+  </figure>
+
+  <figure class="figure-compact">
+    <img src="assets/playground.png" alt="Playground chat with the classic agent" />
+    <figcaption><span class="fig">Figure 3</span><span>The Playground uses the same model, tools, and knowledge as WhatsApp without sending a message. It is the fastest way to test a prompt change.</span></figcaption>
+  </figure>
+
+  <h3>Reading the status signals</h3>
+  <table class="table-compact">
+    <tr><th style="width:27%">Signal</th><th>Meaning</th></tr>
+    <tr><td><strong>Logged out (top right)</strong></td><td>The classic Baileys session is not linked. Hub agents are unaffected.</td></tr>
+    <tr><td><strong>Model ready</strong></td><td>An OpenRouter key is configured and the selected model can be used.</td></tr>
+    <tr><td><strong>OpenCode ready</strong></td><td>The managed OpenCode server is running and answering on its local port.</td></tr>
+    <tr><td><strong>0 of 2 agents polling</strong></td><td>Two hub agents exist, none has an active official-token poller.</td></tr>
+    <tr><td><strong>Token needed / token saved</strong></td><td>Whether a hub agent has a stored official token. Tokens are never displayed again.</td></tr>
+    <tr><td><strong>Stopped / Starting / Running / Error</strong></td><td>The poller state for one hub agent. An error usually includes a short message.</td></tr>
+    <tr><td><strong>Scheduler error</strong></td><td>A cron expression could not be scheduled. Fix the expression or timezone.</td></tr>
+  </table>
+
+  <div class="callout">
+    <span class="label">Screenshot note</span>
+    <p>
+      The sample dashboard shows a hub with two agents and a connected filesystem MCP server. Your own
+      dashboard may show different counts, an empty state, or a red classic-WhatsApp badge.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 9. CLASSIC ================= -->
+<section class="section" id="classic">
+  <div class="kicker">Part II · Chapter 9</div>
+  <h2>Classic bot administration<span class="sub">The QR-linked Baileys bot: persona, model, RAG, MCP, conversations, and the risks of an unofficial session.</span></h2>
+
+  <p class="lead">
+    The classic bot is the original single-agent mode. It is useful when you want a normal WhatsApp
+    number linked by QR and you do not need per-agent official tokens. It is also the mode with the
+    most account risk, because Baileys is not an official WhatsApp integration.
+  </p>
+
+  <h3>Link and maintain the session</h3>
+  <ol>
+    <li>Open <strong>WhatsApp</strong> and press <strong>Connect WhatsApp</strong>.</li>
+    <li>Scan the QR code from WhatsApp → <strong>Linked devices → Link a device</strong>.</li>
+    <li>Wait for the state to become <strong>connected</strong> and the phone number to appear.</li>
+    <li>Keep <code>data/wa-auth</code> in your backups. It contains the session credentials.</li>
+  </ol>
+  <p>
+    A logged-out phone or a removed linked device forces a new QR scan. The dashboard shows the last error.
+    If the session is repeatedly closed with status 401, remove the old session and link again rather than
+    restarting the server in a loop.
+  </p>
+
+  <h3>Persona and generation</h3>
+  <p>
+    <strong>Settings → Persona</strong> sets the bot name, timezone, and system prompt. The timezone is also
+    used by hub schedules. <strong>Model &amp; generation</strong> sets the OpenRouter model, temperature,
+    maximum tokens, history turns, tool steps, and tool timeout. Lower history and tool steps reduce cost and
+    latency; higher values help complex follow-ups.
+  </p>
+
+  <h3>Retrieval settings</h3>
+  <table class="table-compact">
+    <tr><th style="width:26%">Setting</th><th>Effect</th></tr>
+    <tr><td><strong>Enable retrieval</strong></td><td>Turns knowledge search on or off for the classic loop.</td></tr>
+    <tr><td><strong>Auto-inject context</strong></td><td>Adds the best passages to the prompt automatically; turn off to require explicit searches instead.</td></tr>
+    <tr><td><strong>Top K</strong></td><td>How many passages to retrieve. Higher is not always better; too many dilute the answer.</td></tr>
+    <tr><td><strong>Min score</strong></td><td>The relevance floor. Raise it to avoid weak matches; lower it if useful material is being skipped.</td></tr>
+  </table>
+
+  <h3>Group behaviour</h3>
+  <p>
+    <strong>Group mode</strong> controls whether the bot ignores groups, replies only when mentioned, or replies
+    to every message. Mention-only is the safest default. Group messages are more likely to contain unrelated
+    chatter and prompt-injection attempts.
+  </p>
+
+  <h3>Knowledge and RAG</h3>
+  <ol>
+    <li>Open <strong>Knowledge</strong> and add text or upload a supported file (TXT, MD, CSV, JSON, HTML, PDF, DOCX).</li>
+    <li>Wait for indexing. Each document is chunked and embedded locally; the first run downloads the embedding model.</li>
+    <li>Use <strong>Search knowledge</strong> to confirm that a realistic question retrieves the right passage.</li>
+    <li>Reindex after changing the embedding model or editing a source file. Delete obsolete documents rather than leaving contradictions.</li>
+  </ol>
+
+  <figure>
+    <img src="assets/knowledge.png" alt="Knowledge page with document statistics and upload controls" />
+    <figcaption><span class="fig">Figure 4</span><span>Knowledge is shared locally. Hub agents can attach a subset of these documents; the classic bot uses retrieval settings from the dashboard.</span></figcaption>
+  </figure>
+
+  <h3>MCP tools</h3>
+  <p>
+    Add a server on <strong>MCP Tools</strong>, test the connection, then enable it. The classic loop sees the
+    tool names exposed by every enabled server. Disable tools you do not want the model to call. A stdio MCP
+    server runs as a child process with your user privileges; treat its command line as code you trust.
+  </p>
+
+  <div class="callout warn">
+    <span class="label">Unofficial transport</span>
+    <p>
+      Baileys can break when WhatsApp changes its web protocol, and automation can put the linked number at
+      risk. Use a secondary number, do not spam, and keep an official-token hub agent as the migration path
+      for production traffic.
+    </p>
+  </div>
+
+  <h3>Everyday checks</h3>
+  <ul class="checklist">
+    <li>The Overview badge is green and the phone number is correct.</li>
+    <li>The Playground answers with the current model and prompt.</li>
+    <li>Recent runs show reasonable latency and no repeated tool errors.</li>
+    <li>Knowledge search finds the policy you expect.</li>
+    <li>MCP servers that should be connected show a tool count.</li>
+  </ul>
+</section>
+
+<!-- ================= 10. HUB ================= -->
+<section class="section" id="hub">
+  <div class="kicker">Part II · Chapter 10</div>
+  <h2>Multi-agent hub<span class="sub">Several official WhatsApp numbers, each with its own brief, model, tools, knowledge, skills, and schedule — all on one local runtime.</span></h2>
+
+  <p class="lead">
+    The hub is a different transport and a different runtime from the classic bot. Each hub agent owns
+    an official token, a poller, an OpenCode configuration entry, and per-conversation sessions. The
+    dashboard is the control plane; OpenCode does the reasoning and tool work.
+  </p>
+
+  <div class="callout">
+    <span class="label">The mental model</span>
+    <p>
+      An <strong>agent</strong> is a row in SQLite plus a generated block in <code>opencode.json</code>.
+      A <strong>poller</strong> is the process loop that reads one token. A <strong>session</strong> is the
+      model's memory for one sender. None of these are shared between agents unless you deliberately share
+      a knowledge document or an MCP server.
+    </p>
+  </div>
+
+  <h3>10.1 Prerequisites and the official token</h3>
+  <ul class="checklist">
+    <li>OpenCode 2.x is installed and <code>opencode --version</code> works from the same shell that starts the app.</li>
+    <li>The app's OpenRouter key is configured; it is passed to the OpenCode child process as <code>OPENROUTER_API_KEY</code>.</li>
+    <li>You have a token for the specific WhatsApp number from the official WhatsApp Agent Platform.</li>
+    <li>The token has the permissions required to read messages, send messages, and update read/typing status for that number.</li>
+  </ul>
+  <p>
+    Treat the token like a password. It is encrypted with <code>APP_SECRET</code>, never shown again in the
+    dashboard, and never written into <code>opencode.json</code>. One token belongs to one number and one
+    active poller. Do not paste the same token into two agents or run two copies of the app against it.
+  </p>
+
+  <h3>10.2 Create and configure an agent</h3>
+  <ol>
+    <li>Open <strong>Agents</strong> and press <strong>New agent</strong>.</li>
+    <li>Give it a name that tells you the number's job, not just the person: “Customer Support”, “Order Updates”, “Events Desk”.</li>
+    <li>Enter a model in OpenCode form, for example <code>openrouter/openai/gpt-4.1-mini</code>.</li>
+    <li>Paste the official token, write the system prompt, and save.</li>
+    <li>Configure MCP, knowledge, skills, and schedules while the agent is stopped. Save each panel.</li>
+    <li>Use <strong>Test prompt</strong> to confirm the model and prompt work, then <strong>Start</strong> the poller.</li>
+    <li>Send a real WhatsApp message from the creator's phone and confirm the reply before handing the number to users.</li>
+  </ol>
+
+  <figure>
+    <img src="assets/agents.png" alt="Agents page with two configured hub agents" />
+    <figcaption><span class="fig">Figure 5</span><span>The hub workspace. The left column lists agents and their lifecycle state; the right column edits the selected agent. “Token saved” means the encrypted token exists, not that it was validated.</span></figcaption>
+  </figure>
+
+  <h3>10.3 Model and system prompt</h3>
+  <p>
+    Hub models use OpenCode's provider-prefixed form. For OpenRouter models the prefix is
+    <code>openrouter/</code>, followed by the provider and model id. The model must be one your OpenRouter
+    key can access and afford; a free model is useful for smoke tests but may have rate limits or weaker
+    tool use.
+  </p>
+  <table class="table-compact">
+    <tr><th style="width:38%">Field</th><th>Guidance</th></tr>
+    <tr><td><strong>Model</strong></td><td>Use <code>openrouter/&lt;provider&gt;/&lt;model&gt;</code>. New agents inherit the classic model with the prefix added.</td></tr>
+    <tr><td><strong>System prompt</strong></td><td>The agent's brief: role, audience, tone, facts it must not invent, escalation rules, and boundaries. The runtime prepends WhatsApp formatting and safety instructions automatically.</td></tr>
+    <tr><td><strong>Enabled</strong></td><td>Disabled agents cannot be started; saving the disabled state stops a running poller. Their settings, skills, and schedules remain stored.</td></tr>
+    <tr><td><strong>Auto-start</strong></td><td>Starts the poller when the app boots. Use it for production agents; leave it off while experimenting.</td></tr>
+    <tr><td><strong>Read receipts</strong></td><td>Marks inbound messages as read through the official API.</td></tr>
+    <tr><td><strong>Typing indicator</strong></td><td>Optional. If the API rejects it, the app falls back to the read receipt and continues.</td></tr>
+  </table>
+
+  <figure>
+    <img src="assets/agent-config.png" alt="Agent configuration with name, model, prompt, and token fields" />
+    <figcaption><span class="fig">Figure 6</span><span>Configuration stays in one panel: identity, model, prompt, official token, and lifecycle flags. The token field is write-only.</span></figcaption>
+  </figure>
+
+  <div class="callout warn">
+    <span class="label">Model quotas are real</span>
+    <p>
+      OpenCode reports provider errors, including insufficient credits and context-length failures, in the
+      run result and the dashboard log. A hub agent that answers “I could not handle that message” may have a
+      model quota problem rather than a WhatsApp problem. Check <strong>Logs &amp; runs</strong> and the
+      runtime log tail before changing the token.
+    </p>
+  </div>
+
+  <h3>10.4 MCP access, isolated per agent</h3>
+  <p>
+    MCP servers are created once on <strong>MCP Tools</strong>, then bound to individual agents. The hub
+    writes every enabled server into <code>opencode.json</code>, but adds explicit deny rules for every server
+    an agent is <em>not</em> bound to. Tool names are exposed with a normalized server prefix, so a server
+    named <code>filesystem</code> exposes tools such as <code>filesystem_read_file</code>. The runtime also
+    disables OpenCode's generic MCP resource listing and reading for unbound servers.
+  </p>
+  <ul>
+    <li><strong>Bind only what the agent needs.</strong> A support agent does not need a deployment tool.</li>
+    <li><strong>Review disabled tools.</strong> The MCP server can hide individual tools from the model without disconnecting the server.</li>
+    <li><strong>Prefer read-only tools</strong> for customer-facing agents. Any write tool can be triggered by a persuasive message or a malicious document.</li>
+    <li><strong>Test before starting.</strong> Use the MCP <strong>Test</strong> button to confirm the command or URL, credentials, and tool list.</li>
+  </ul>
+
+  <div class="figure-pair">
+    <figure>
+      <img src="assets/agent-tools.png" alt="Agent MCP tools, knowledge, and skills panels" />
+      <figcaption><span class="fig">Figure 7</span><span>Bindings are visible per agent. The badge shows bound servers over enabled servers; each row shows connection state and tool count.</span></figcaption>
+    </figure>
+    <figure>
+      <img src="assets/mcp.png" alt="MCP Tools page with a connected filesystem server" />
+      <figcaption><span class="fig">Figure 8</span><span>MCP servers are managed centrally, then enabled, tested, and bound. A stdio server runs as a local child process.</span></figcaption>
+    </figure>
+  </div>
+
+  <h3>10.5 Knowledge</h3>
+  <p>
+    Knowledge is uploaded once and can be attached to several agents. The hub searches only the documents
+    attached to the current agent, and injects the best passages before the prompt reaches OpenCode. This is
+    useful for policies, product facts, price lists, and internal procedures.
+  </p>
+  <ol>
+    <li>Upload and index the document on <strong>Knowledge</strong>.</li>
+    <li>Search it with a realistic question and check the retrieved passage.</li>
+    <li>Attach it to the agent and save.</li>
+    <li>Ask the agent a question that requires the document; verify that it cites or follows the content.</li>
+  </ol>
+
+  <h3>10.6 Skills</h3>
+  <p>
+    A skill is a reusable block of Markdown instructions. Skills are stored in SQLite, written to
+    <code>.opencode/skills/wa-hub-*</code> on each config sync, and appended to the agent's system prompt.
+    Use them for procedures that would otherwise make every agent's prompt huge: refund handling, escalation
+    tone, status vocabulary, or a checklist for a specific task.
+  </p>
+  <div class="grid-2">
+    <div class="card">
+      <h4>Good skill</h4>
+      <p>Short, scoped, and testable. “When a customer asks for a refund: confirm the order, apply the 30-day window, offer a replacement first, escalate above 100 USD.”</p>
+    </div>
+    <div class="card">
+      <h4>Bad skill</h4>
+      <p>A second copy of the whole company handbook, contradictory policies, or instructions that grant new tool permissions. Skills shape behaviour; they do not grant access.</p>
+    </div>
+  </div>
+
+  <h3>10.7 Schedules</h3>
+  <p>
+    Schedules run cron prompts on the local scheduler. The reply is sent to the agent's <strong>creator</strong>
+    — the first WhatsApp sender recorded for that agent — and stored in that creator's conversation with a
+    separate <code>schedule</code> model context. Schedules run while the app is running even if the agent's
+    poller is stopped, provided the agent still has a token and a creator.
+  </p>
+  <table class="table-compact">
+    <tr><th style="width:30%">Rule</th><th>Detail</th></tr>
+    <tr><td><strong>Cron syntax</strong></td><td>Validated when saved. Standard five-field cron is enough for most jobs: minute, hour, day of month, month, day of week.</td></tr>
+    <tr><td><strong>Timezone</strong></td><td>Uses the timezone in <strong>Settings</strong>. An empty timezone falls back to the server's local timezone.</td></tr>
+    <tr><td><strong>Creator required</strong></td><td>If no one has messaged the agent, the job records an error instead of sending. Send the agent a message first.</td></tr>
+    <tr><td><strong>Manual run</strong></td><td>The <strong>Run now</strong> button executes the same path immediately; use it to test the prompt and delivery.</td></tr>
+    <tr><td><strong>Failure handling</strong></td><td>A failed model call or send is recorded on the schedule and in the logs. It does not retry forever.</td></tr>
+  </table>
+
+  <figure>
+    <img src="assets/agent-schedules.png" alt="Agent schedules panel with cron expressions and prompts" />
+    <figcaption><span class="fig">Figure 9</span><span>Schedules belong to an agent. The example uses a daily support digest and a weekday order summary; the output goes to the creator's WhatsApp chat.</span></figcaption>
+  </figure>
+
+  <h3>10.8 Start, stop, restart, and reset</h3>
+  <ul>
+    <li><strong>Start</strong> creates the official client, verifies that a token exists, ensures OpenCode is running, syncs the generated config, and begins polling.</li>
+    <li><strong>Stop</strong> aborts the poller but keeps the token, sessions, skills, and schedules. Schedules can still run.</li>
+    <li><strong>Reset session</strong> stops the agent, clears every stored OpenCode session for that agent, and restarts it if it was running. The dashboard transcripts remain.</li>
+    <li><strong>Delete</strong> stops the agent, removes its token, bindings, skills, schedules, sessions, and generated config entry. This cannot be undone.</li>
+  </ul>
+
+  <div class="callout">
+    <span class="label">HTTP 409 is a token collision</span>
+    <p>
+      The official API allows one active poller per token. If a second app instance or a leftover process
+      polls the same token, the API returns HTTP 409. Stop the duplicate process; do not create a second agent
+      with the same token.
+    </p>
+  </div>
+
+  <h3>10.9 Conversation and media behaviour</h3>
+  <p>
+    Each sender gets a separate OpenCode session and a separate dashboard conversation named after the
+    agent and sender. Test prompts use a <code>test</code> context, schedules use a <code>schedule</code>
+    context, and customer chats use the sender's id. This prevents a test or a scheduled job from inheriting
+    a customer's conversation — and prevents customers from inheriting each other's.
+  </p>
+  <p>
+    Inbound images, audio, video, and documents are downloaded through the official API and written to
+    <code>data/uploads</code>. Files larger than 20 MB are skipped to protect the local runtime. The file is
+    attached to the OpenCode prompt; whether the model can interpret it depends on the selected model's
+    modality support. If an attachment is ignored, ask the user to send the text or convert the file.
+  </p>
+
+  <h3>10.10 Generated OpenCode configuration</h3>
+  <p>
+    The runtime generates <code>opencode.json</code> at the project root from the current agents, enabled MCP
+    servers, bound knowledge, and skills. It contains:
+  </p>
+  <ul>
+    <li>A default model and one <code>agents.wa_hub_*</code> block per hub agent.</li>
+    <li>The full system prompt, including base WhatsApp instructions and enabled skills.</li>
+    <li>MCP server definitions, with <code>codemode: false</code>, and deny permissions for unbound servers.</li>
+    <li>No WhatsApp tokens, no OpenRouter key, and no dashboard password.</li>
+  </ul>
+  <p>
+    If an existing unmanaged <code>opencode.json</code> is present, it is backed up once as
+    <code>opencode.json.bak-&lt;timestamp&gt;</code>. <code>data/opencode-managed.json</code> stores the hash of
+    the file the app wrote, so it is not backed up repeatedly. Saving an agent, deleting an agent, or changing
+    an MCP server refreshes the file. The running OpenCode server reloads it when it is already up; otherwise
+    the file is simply written for the next start.
+  </p>
+
+  <div class="callout admin">
+    <span class="label">Do not hand-edit while the hub runs</span>
+    <p>
+      The next save will overwrite your edits. If you need to inspect or debug the generated file, copy it
+      aside first. To force a clean regeneration, use the runtime reload control or restart the app after
+      making the change in the dashboard.
+    </p>
+  </div>
+
+  <h3>10.11 Hub checklist</h3>
+  <ul class="checklist">
+    <li><code>opencode --version</code> succeeds in the app's environment.</li>
+    <li>The agent has a token and the status is <strong>Running</strong>, not just <strong>Enabled</strong>.</li>
+    <li>The creator is recorded and can receive a test send.</li>
+    <li>Only the intended MCP servers are bound; write tools are reviewed.</li>
+    <li>Knowledge is attached and a realistic question retrieves the right passage.</li>
+    <li>Skills are short, non-contradictory, and tested.</li>
+    <li>Schedules have a creator, a valid timezone, and a successful manual run.</li>
+    <li>The generated config contains the expected agents and no deleted MCP servers.</li>
+  </ul>
+</section>
+
+<!-- ================= 11. TUI ================= -->
+<section class="section" id="tui">
+  <div class="kicker">Part II · Chapter 11</div>
+  <h2>Terminal monitor<span class="sub">A small TUI for the moments when opening a browser is more effort than it is worth.</span></h2>
+
+  <p class="lead">
+    <code>npm run tui</code> signs in to the local API, shows the classic WhatsApp state, the OpenCode
+    runtime, and every hub agent, and lets you start, stop, or restart an agent without leaving the shell.
+  </p>
+
+  <pre class="code"><code>cd "$env:USERPROFILE\\Documents\\Projects\\WhatsApp-Agent"
+npm run tui</code></pre>
+
+  <p>
+    The TUI reads <code>ADMIN_PASSWORD</code> from <code>.env</code> when it is present; otherwise it asks
+    for the password with hidden input. It connects to <code>APP_URL</code> if set, or to
+    <code>http://127.0.0.1:8787</code> by default. The screen refreshes every five seconds.
+  </p>
+
+  <div class="terminal"><span class="green">WhatsApp Agent Hub</span>  <span class="dim">- http://127.0.0.1:8787</span>
+<span class="dim">classic WhatsApp:</span> connected <span class="dim">(+1 555 010 7788)</span>   <span class="dim">OpenCode:</span> <span class="green">ready</span>   <span class="dim">polling:</span> 2/2
+<span class="bar">------------------------------------------------------------------------------------------------</span>
+
+  <span class="green">&gt;</span> Customer Support         <span class="green">running</span>   gpt-4.1-mini        creator: set
+    Order Updates            <span class="green">running</span>   gemini-2.5-flash   creator: set
+
+<span class="dim">selected agent</span>  Customer Support
+<span class="dim">status</span>           running        <span class="dim">auto-start:</span> yes   <span class="dim">enabled:</span> yes
+<span class="dim">mcp servers</span>      filesystem (14 tools)   <span class="dim">knowledge:</span> 1 doc
+<span class="dim">schedules</span>       1 enabled      <span class="dim">last seen:</span> 2 minutes ago
+
+<span class="dim">up/down select  -  s start/stop  -  r reset + restart  -  R refresh  -  q quit</span>
+<span class="dim">Illustrative view; agent names and counts depend on your hub.</span></div>
+
+  <h3>Keys</h3>
+  <table class="table-compact">
+    <tr><th style="width:24%">Key</th><th>Action</th></tr>
+    <tr><td><code>&uarr;</code> / <code>k</code></td><td>Select the previous agent.</td></tr>
+    <tr><td><code>&darr;</code> / <code>j</code></td><td>Select the next agent.</td></tr>
+    <tr><td><code>s</code></td><td>Start the selected agent, or stop it if it is already running.</td></tr>
+    <tr><td><code>r</code></td><td>Reset the agent's session and restart it. This clears model context for every conversation.</td></tr>
+    <tr><td><code>R</code></td><td>Refresh the screen immediately. The automatic refresh continues every five seconds.</td></tr>
+    <tr><td><code>q</code> / <code>Ctrl+C</code></td><td>Quit. The API server keeps running.</td></tr>
+  </table>
+
+  <div class="callout">
+    <span class="label">What the TUI can and cannot do</span>
+    <p>
+      It can start, stop, and reset agents, but it is not a full editor. Creating agents, binding MCP
+      servers, editing prompts, and managing schedules still happen in the dashboard. The TUI is a monitor
+      and a fast lifecycle switch.
+    </p>
+  </div>
+
+  <h3>When the TUI will not connect</h3>
+  <ul>
+    <li>Confirm the API is running and <code>APP_URL</code> points to the right host and port.</li>
+    <li>If <code>ADMIN_PASSWORD</code> is not in the environment used to launch the TUI, it prompts. A wrong password hits the normal login rate limit.</li>
+    <li>The TUI shows the API error text at the bottom of the screen; fix the API first, then press <code>R</code>.</li>
+  </ul>
+
+  <h3>Reading an agent line</h3>
+  <table class="table-compact">
+    <tr><th style="width:28%">Field</th><th>What to check</th></tr>
+    <tr><td><strong>running / stopped / error</strong></td><td>The poller state. <strong>Running</strong> means the official poller is active, not merely that the profile is enabled.</td></tr>
+    <tr><td><strong>Model</strong></td><td>The final component of the OpenCode model id. Confirm it is the model you intended, especially after a quota change.</td></tr>
+    <tr><td><strong>creator: set / missing</strong></td><td>Whether the first sender is recorded. Schedules and test sends fail without a creator.</td></tr>
+    <tr><td><strong>MCP servers</strong></td><td>Bound server names and tool counts. A server that was enabled in the dashboard but not bound should not appear here.</td></tr>
+    <tr><td><strong>Knowledge / schedules</strong></td><td>Attached document count and enabled cron job count. Zero is valid for a new agent.</td></tr>
+    <tr><td><strong>Last seen</strong></td><td>The last inbound message time. A running agent with no traffic is normal; a growing gap during business hours may not be.</td></tr>
+  </table>
+
+  <h3>A five-minute morning check</h3>
+  <ol>
+    <li>Confirm the classic badge matches the session you expect. A hub-only deployment can stay logged out.</li>
+    <li>Check that every agent you expect to serve traffic is <strong>running</strong>, not just enabled.</li>
+    <li>Open the agent with the highest traffic and confirm its model, creator, and MCP counts.</li>
+    <li>Press <code>R</code> once and look for an error line. The automatic refresh continues every five seconds.</li>
+    <li>Open <strong>Logs &amp; runs</strong> in the dashboard for quota errors, repeated tool failures, or a fallback storm.</li>
+  </ol>
+
+  <div class="callout warn">
+    <span class="label">Status is not health</span>
+    <p>
+      A green <strong>running</strong> label only proves that the poller has not stopped. It does not prove that
+      the model has credit, that the token still has the right scopes, or that replies are reaching users.
+      Send one real test message after any token, model, or prompt change.
+    </p>
+  </div>
+</section>
+
+<!-- ================= 12. OPERATIONS ================= -->
+<section class="section" id="operations">
+  <div class="kicker">Part II · Chapter 12</div>
+  <h2>Operations, limits, and backups<span class="sub">The day-two work: capacity, token collisions, model cost, upgrades, and a backup you can actually restore.</span></h2>
+
+  <p class="lead">
+    A working demo is not an operating service. The hub adds external rate limits, a child runtime, and
+    long-lived tokens to the classic bot's usual concerns. This chapter is the maintenance checklist.
+  </p>
+
+  <h3>Official API limits</h3>
+  <table>
+    <tr><th style="width:36%">Operation</th><th style="width:22%">Documented cap</th><th>Applied in this app</th></tr>
+    <tr><td>Message sends</td><td>12 / minute</td><td>11 / minute, with a send queue</td></tr>
+    <tr><td>Status updates (read/typing)</td><td>12 / minute</td><td>11 / minute</td></tr>
+    <tr><td>Polls</td><td>15 / minute</td><td>14 / minute</td></tr>
+    <tr><td>Media operations</td><td>12 / minute</td><td>11 / minute</td></tr>
+  </table>
+  <p>
+    The internal limiters keep a small margin under the published caps. They are per agent. Sending a burst
+    of WhatsApp replies may queue rather than fail; a sustained burst is still a design problem. Split long
+    messages deliberately and avoid sending duplicate answers.
+  </p>
+
+  <h3>One poller per token</h3>
+  <p>
+    The official API tracks the active poller for each token. Running the app twice against the same token
+    returns HTTP 409 and can leave both instances confused. Run one API process per token. If you need two
+    numbers, create two agents with two tokens; they can share one app process and one OpenCode server.
+  </p>
+  <p>
+    Poll offsets are stored as 64-bit values in SQLite. A replayed offset is deduplicated through
+    <code>hub_messages</code>, so a restart does not normally produce duplicate replies. If you deliberately
+    reset an offset, expect the API to replay messages; the dedupe table is the safety net.
+  </p>
+
+  <h3>OpenCode lifecycle and ports</h3>
+  <ul>
+    <li>OpenCode starts on the first hub prompt or agent start, not when the dashboard is opened.</li>
+    <li>It listens on <code>127.0.0.1</code> with a random Basic-auth password. The app starts at
+      <code>OPENCODE_PORT</code> (4096) and tries a small number of following ports if it is busy.</li>
+    <li>The process stays up while the app runs, even if every poller is stopped. It stops during graceful
+      app shutdown.</li>
+    <li>If OpenCode crashes, the next prompt or start calls <code>ensure()</code> and respawns it. The
+      configuration is written again and reloaded.</li>
+    <li>Do not expose the OpenCode port. It has its own authentication, but it is not designed as a public
+      service.</li>
+  </ul>
+
+  <h3>Schedules and polling are independent</h3>
+  <p>
+    A stopped poller does not disable schedules. If the agent still has a token and a recorded creator,
+    enabled cron jobs continue to run and send results while the app is up. This is useful for morning
+    digests, but it can surprise you during maintenance. Pause the schedules or stop the app if you need a
+    complete quiet period.
+  </p>
+
+  <h3>Model cost and capacity</h3>
+  <table class="table-compact">
+    <tr><th style="width:28%">Pressure</th><th>What happens</th><th>Response</th></tr>
+    <tr><td><strong>Credits exhausted</strong></td><td>OpenCode returns a provider error; the hub sends the fallback reply.</td><td>Top up OpenRouter, switch to a cheaper model, or use a free model for tests.</td></tr>
+    <tr><td><strong>Context too long</strong></td><td>The model rejects the prompt or truncates history.</td><td>Reset the session, shorten the prompt, reduce attachments, or summarize earlier turns.</td></tr>
+    <tr><td><strong>Slow tools</strong></td><td>Replies arrive late or the run fails on timeout.</td><td>Disable slow MCP tools for that agent; increase the tool timeout only after measuring.</td></tr>
+    <tr><td><strong>Rate limits</strong></td><td>The provider returns 429 or a queue delay.</td><td>Lower concurrency, add a cheaper fallback model for bursts, or reduce schedule frequency.</td></tr>
+  </table>
+
+  <h3>Backups</h3>
+  <p>
+    The simplest reliable backup is a stopped-app copy. SQLite in WAL mode is safe to copy while the app is
+    running only if you use a SQLite-aware backup tool; a raw file copy can miss the WAL. For a
+    single-machine deployment, stop the app, copy the data, then start it again.
+  </p>
+  <pre class="code"><code># Stop the app first (Ctrl+C in the terminal running npm start)
+Copy-Item .env "D:\\Backups\\whatsapp-agent\\env-$(Get-Date -Format yyyyMMdd).bak"
+Copy-Item data "D:\\Backups\\whatsapp-agent\\data-$(Get-Date -Format yyyyMMdd)" -Recurse</code></pre>
+  <p>What to keep together:</p>
+  <ul>
+    <li><code>.env</code> — especially <code>APP_SECRET</code>; without it the encrypted secrets are unreadable.</li>
+    <li><code>data/agent.sqlite</code> and its WAL/SHM files if copied live.</li>
+    <li><code>data/wa-auth</code> — the classic session credentials.</li>
+    <li><code>data/uploads</code> — inbound hub media.</li>
+    <li><code>opencode.json</code> and <code>data/opencode-managed.json</code> — optional, because they can be regenerated, but useful for debugging a specific configuration.</li>
+  </ul>
+  <p>
+    <code>data/models</code> is a cache; you can omit it and let the app download the embedding model again.
+    Backups contain plaintext messages, prompts, and media. Encrypt the backup destination and restrict
+    access.
+  </p>
+
+  <h3>Restore and upgrade</h3>
+  <ol>
+    <li>Stop the app. Restore <code>.env</code> and <code>data/</code> from the same backup set.</li>
+    <li>Run <code>npm install</code> and <code>npm run build</code> for the target version.</li>
+    <li>Start the app and sign in. Schema migrations run automatically on startup.</li>
+    <li>Check the classic session, hub agent states, the generated config, and one test prompt.</li>
+    <li>Reconnect WhatsApp or re-enter tokens only if the restored secrets cannot be decrypted.</li>
+  </ol>
+  <p>
+    Upgrades may add tables or columns. Back up before every upgrade, and read the release notes for
+    changes to the generated OpenCode configuration, official API behaviour, or model defaults.
+  </p>
+
+  <h3>Disk and hygiene</h3>
+  <ul>
+    <li>The embedding model cache is roughly tens of megabytes; uploads grow with customer traffic.</li>
+    <li>Review <code>data/uploads</code> on a schedule. Deleting a chat does not delete its media files.</li>
+    <li>The application log buffer is in memory and bounded; agent runs and messages are in SQLite and grow until deleted.</li>
+    <li>Keep at least a few gigabytes free for SQLite, media, logs, and OpenCode.</li>
+    <li>Do not store unrelated files in the project root; the generated config and backup files live there.</li>
+  </ul>
+
+  <h3>Health checks</h3>
+  <ul class="checklist">
+    <li><code>http://127.0.0.1:8787</code> loads and the dashboard session works.</li>
+    <li>The classic badge matches reality; a hub-only deployment can stay logged out.</li>
+    <li><strong>Agents</strong> shows the expected number of pollers and no repeating errors.</li>
+    <li><strong>Logs &amp; runs</strong> shows recent model calls with sane latency and no quota storm.</li>
+    <li><code>opencode.json</code> contains only current agents and MCP servers.</li>
+    <li>A backup from the last day exists and its <code>APP_SECRET</code> matches the data.</li>
+  </ul>
+
+  <h3>Reading the logs</h3>
+  <p>
+    The log view is the first place to look after a status change. Filter by the agent name, then read the
+    earliest error in the run rather than the final fallback message.
+  </p>
+  <figure>
+    <img src="assets/logs.png" alt="Logs and runs page with application log lines and run history" />
+    <figcaption><span class="fig">Figure 10</span><span>Logs &amp; runs combines live application events with a searchable history of model calls, tokens, latency, and tool failures.</span></figcaption>
+  </figure>
+  <ul>
+    <li><strong>Quota or 429:</strong> the provider rejected the call; check credit and concurrency before changing the agent.</li>
+    <li><strong>Repeated tool errors:</strong> the MCP server is down or the model is calling a disabled tool. Test the server on <strong>MCP Tools</strong>.</li>
+    <li><strong>Fallback storm:</strong> many failures in a row usually mean one shared cause — token, model, or runtime — not many independent user problems.</li>
+  </ul>
+</section>
+
+<!-- ================= 13. SECURITY ================= -->
+<section class="section" id="security">
+  <div class="kicker">Part II · Chapter 13</div>
+  <h2>Security checklist<span class="sub">What to lock down before a real number, a real customer, or a real token touches the system.</span></h2>
+
+  <p class="lead">
+    The default deployment is a localhost tool for one operator. That is a reasonable starting point, not a
+    finished security posture. Every step beyond localhost — a reverse proxy, a public number, a remote MCP
+    server — adds a decision.
+  </p>
+
+  <h3>Network exposure</h3>
+  <table>
+    <tr><th style="width:30%">Surface</th><th>Baseline</th><th>If you expose it</th></tr>
+    <tr><td><strong>Dashboard / API</strong></td><td>Bind <code>127.0.0.1</code>; reach it through a local browser.</td><td>Put it behind a TLS reverse proxy, restrict source IPs, and keep the admin password strong. Do not open 8787 directly.</td></tr>
+    <tr><td><strong>OpenCode server</strong></td><td>Localhost, random Basic-auth password, managed by the app.</td><td>Do not expose it. It is an internal runtime, not a public API.</td></tr>
+    <tr><td><strong>Vite dev server</strong></td><td>Localhost only, development use.</td><td>Do not run development mode on a public interface.</td></tr>
+    <tr><td><strong>Official API token</strong></td><td>Encrypted in SQLite; never displayed after save.</td><td>Grant the minimum scopes, rotate if leaked, and keep one token per number.</td></tr>
+    <tr><td><strong>MCP servers</strong></td><td>Only servers you trust; least privilege.</td><td>Treat remote MCP URLs and headers as secrets; use TLS and scoped credentials.</td></tr>
+  </table>
+
+  <h3>Authentication and secrets</h3>
+  <ul>
+    <li>Use a long, unique <code>ADMIN_PASSWORD</code>. Login failures are rate-limited, but a weak password is still weak.</li>
+    <li>Set a random <code>APP_SECRET</code> of 24+ characters <em>before</em> storing keys. It is the only key to the AES-256-GCM encrypted secrets.</li>
+    <li>Changing <code>APP_SECRET</code> makes existing OpenRouter keys and WhatsApp tokens unreadable. Back up the old value or plan to re-enter the secrets.</li>
+    <li>The dashboard cookie is HTTP-only and same-site oriented. Use the same hostname (for example always <code>127.0.0.1</code>) to avoid confusing cookie scope.</li>
+    <li>Never commit <code>.env</code>, <code>data/</code>, backups, or screenshots containing tokens or customer data.</li>
+  </ul>
+
+  <h3>Generated configuration</h3>
+  <p>
+    <code>opencode.json</code> contains the system prompts, skill text, MCP server definitions, and deny
+    rules. It does <strong>not</strong> contain WhatsApp tokens or the OpenRouter key. It can still contain
+    confidential instructions, internal URLs, and MCP headers. Restrict file permissions and treat it as
+    sensitive. The generated file is overwritten by the dashboard; do not paste secrets into it.
+  </p>
+
+  <h3>MCP trust</h3>
+  <ul>
+    <li>A stdio MCP server is a program running with your user privileges. Read its command line before enabling it.</li>
+    <li>Prefer read-only tools for customer-facing agents. A write tool is an authorization decision, not a feature toggle.</li>
+    <li>Bind only the servers an agent needs. Unbound servers are explicitly denied, but the bound ones are fully available unless individual tools are disabled.</li>
+    <li>Remote MCP servers receive the data the model sends. Review their privacy and retention terms.</li>
+    <li>Test a new server in isolation before giving it to a production agent.</li>
+  </ul>
+
+  <h3>Prompt injection and untrusted inputs</h3>
+  <p>
+    Treat every document, web page, image, and tool output as untrusted content. An attacker can embed
+    instructions that try to make the model ignore its brief, reveal system prompts, or call a tool. Defences
+    are layered: keep tool permissions narrow, avoid exposing secrets to the model, separate instructions
+    from retrieved content, and review surprising tool calls. No prompt alone is a security boundary.
+  </p>
+
+  <h3>Data protection</h3>
+  <ul>
+    <li>Decide what may be stored before inviting users. Messages and media are persisted locally until deleted.</li>
+    <li>Backups are plaintext unless you encrypt the destination. Protect them like the live database.</li>
+    <li>Redact personal data from screenshots, support tickets, and logs.</li>
+    <li>Delete obsolete knowledge and chats on a schedule; do not rely on automatic expiry, because there is none.</li>
+    <li>If you handle regulated data, complete your own retention, consent, and vendor review. This guide is not legal advice.</li>
+  </ul>
+
+  <h3>WhatsApp transport risk</h3>
+  <p>
+    The classic bot uses Baileys, an unofficial WhatsApp Web client. It can stop working when WhatsApp changes
+    its protocol, and automation can put the linked number at risk of restriction. Use a secondary number,
+    avoid bulk or unsolicited messaging, and migrate production traffic to official-token hub agents. The
+    official transport is not risk-free either: follow the platform's policies and rate limits.
+  </p>
+
+  <h3>Pre-launch checklist</h3>
+  <ul class="checklist">
+    <li>Dashboard bound to localhost or behind TLS with source restrictions.</li>
+    <li>Strong admin password; login rate limiting understood.</li>
+    <li>Random <code>APP_SECRET</code> stored with the backup set.</li>
+    <li>Official tokens scoped and rotated on a schedule.</li>
+    <li>MCP servers reviewed; write tools minimized; disabled tools documented.</li>
+    <li>Prompts checked for secrets and unnecessary personal data.</li>
+    <li>Retention and deletion policy written down and followed.</li>
+    <li>Backups tested by restoring to a clean folder.</li>
+    <li>One poller per token; duplicate app instances eliminated.</li>
+    <li>Incident contact and token-revocation procedure known.</li>
+  </ul>
+</section>
+
+<!-- ================= 14. ADMIN HELP ================= -->
+<section class="section" id="admin-help">
+  <div class="kicker">Part II · Chapter 14</div>
+  <h2>Admin troubleshooting &amp; FAQ<span class="sub">Start with the layer that failed: dashboard, classic transport, hub transport, model, tools, or storage.</span></h2>
+
+  <p class="lead">
+    Most failures leave a specific message in <strong>Logs &amp; runs</strong>, the hub runtime log tail, or
+    the terminal that started the app. Read the first error, not the last symptom.
+  </p>
+
+  <h3>Dashboard and authentication</h3>
+  <table>
+    <tr><th style="width:31%">Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+    <tr><td><strong>“Authentication required” on every call</strong></td><td>Missing or expired cookie; wrong hostname; session after restart.</td><td>Sign in again at the same host. Check the browser is not blocking the cookie. Wait out the 15-minute login lockout if needed.</td></tr>
+    <tr><td><strong>“ADMIN_PASSWORD is not configured”</strong></td><td>Empty <code>ADMIN_PASSWORD</code>.</td><td>Set it in <code>.env</code> and restart. Do not expose the dashboard without one.</td></tr>
+    <tr><td><strong>Login works, then immediately signs out</strong></td><td>Changing <code>APP_SECRET</code> or a cookie scoped to a different host.</td><td>Use one hostname; restore the original secret or sign in again after the change.</td></tr>
+    <tr><td><strong>Too many login attempts</strong></td><td>Rate limiter after repeated failures.</td><td>Wait 15 minutes. Check the password in <code>.env</code>; avoid retry loops.</td></tr>
+  </table>
+
+  <h3>Classic WhatsApp</h3>
+  <table>
+    <tr><th style="width:31%">Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+    <tr><td><strong>No QR code</strong></td><td>Session already exists; socket not started; UI not refreshed.</td><td>Open <strong>WhatsApp</strong>, press connect, wait for the socket. If the phone is still linked, disconnect it first.</td></tr>
+    <tr><td><strong>Logged out / status 401</strong></td><td>The linked device was removed or the session expired.</td><td>Link again with a new QR code. Backups of <code>wa-auth</code> only help if the session is still valid.</td></tr>
+    <tr><td><strong>Connected but no replies</strong></td><td>Auto-reply off, group mode blocking, model error, or tool loop.</td><td>Check Settings, Playground, and Logs. Send a direct message that mentions the bot if group mode is on.</td></tr>
+    <tr><td><strong>Repeated disconnects</strong></td><td>Network instability, protocol change, or multiple sessions on the number.</td><td>Use one linked session; keep the phone online; check the terminal for the disconnect reason.</td></tr>
+  </table>
+
+  <h3>Hub agents</h3>
+  <table>
+    <tr><th style="width:31%">Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+    <tr><td><strong>Start button disabled</strong></td><td>No token, or the agent is disabled.</td><td>Save a token and enable the agent. A disabled agent cannot be started by design.</td></tr>
+    <tr><td><strong>HTTP 409 on start</strong></td><td>Another poller owns the token.</td><td>Stop the duplicate app or process. Use one token per agent.</td></tr>
+    <tr><td><strong>Running but no replies</strong></td><td>Token scope, offset, official API outage, or a runtime error before send.</td><td>Check the hub log tail and the official API status. Remove and re-add the token if its permissions changed. Look for the fallback reply.</td></tr>
+    <tr><td><strong>“OpenCode is not running”</strong></td><td>Executable missing, port exhausted, or the child crashed.</td><td>Run <code>opencode --version</code> in the app's shell. Set <code>OPENCODE_BIN</code> to the full path. Check <code>OPENCODE_PORT</code> and logs.</td></tr>
+    <tr><td><strong>“OpenCode rejected the generated configuration”</strong></td><td>Invalid model id, MCP definition, or permission block.</td><td>Fix the model or MCP server, save again, and reload. Inspect <code>opencode.json</code> for the last change.</td></tr>
+    <tr><td><strong>Fallback reply</strong></td><td>Model error, quota, context length, or tool failure.</td><td>Read the run error. Switch model or top up credits; reset the session if the context is too long.</td></tr>
+    <tr><td><strong>Agent deleted but config still mentions it</strong></td><td>Stale generated file from an older build or a failed refresh.</td><td>Save any agent or MCP server to refresh, or restart the app. Confirm the managed hash file is writable.</td></tr>
+  </table>
+
+  <h3>Models and tools</h3>
+  <table>
+    <tr><th style="width:31%">Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+    <tr><td><strong>Quota or credit error</strong></td><td>The OpenRouter account cannot afford the selected model.</td><td>Use a cheaper or <code>:free</code> model for tests; top up for production. Check the model id is valid.</td></tr>
+    <tr><td><strong>Context length error</strong></td><td>Long conversation, large attachment, or too much knowledge.</td><td>Reset the session, reduce top K, split the file, or use a larger-context model.</td></tr>
+    <tr><td><strong>MCP server will not connect</strong></td><td>Wrong command/URL, missing credentials, or <code>npx</code>/<code>node</code> not on PATH.</td><td>Use the MCP <strong>Test</strong> button. Run the command manually in the project folder. Check remote TLS and headers.</td></tr>
+    <tr><td><strong>Tools missing for one hub agent</strong></td><td>Server disabled, not bound, or the agent was not saved.</td><td>Enable the server, bind it, save the agent, and restart. Unbound servers are denied by design.</td></tr>
+    <tr><td><strong>Tool call loops</strong></td><td>The model repeats a failing call or the tool result is unclear.</td><td>Disable the tool, improve its description, reduce the step budget, or switch models.</td></tr>
+    <tr><td><strong>Skills not applied</strong></td><td>Skill disabled, agent not restarted, or the generated file was not refreshed.</td><td>Enable the skill, save the agent, restart it, and check the prompt in <code>opencode.json</code>.</td></tr>
+  </table>
+
+  <h3>Knowledge, media, and storage</h3>
+  <table>
+    <tr><th style="width:31%">Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+    <tr><td><strong>Embeddings unavailable</strong></td><td>Model download failed or no network access to Hugging Face.</td><td>Check <code>LOG_LEVEL=debug</code>, network/proxy settings, and disk space. Retry the upload.</td></tr>
+    <tr><td><strong>Wrong knowledge retrieved</strong></td><td>Stale or contradictory documents; top K too high/low.</td><td>Delete obsolete documents, reindex, tune top K and min score, and test with realistic questions.</td></tr>
+    <tr><td><strong>Attachment ignored</strong></td><td>Over 20 MB, unsupported type, or a model without that modality.</td><td>Convert to text/PDF, split the file, or choose a multimodal model. Media over 20 MB is skipped.</td></tr>
+    <tr><td><strong>Disk filling up</strong></td><td>Uploads, model cache, database, or old backups.</td><td>Review <code>data/uploads</code> and backups; delete obsolete chats/documents; keep the model cache if you use RAG.</td></tr>
+    <tr><td><strong>“Database is locked”</strong></td><td>A second writer, antivirus scan, or a long transaction.</td><td>Run one app instance; wait; check the terminal. WAL and a five-second busy timeout handle normal contention.</td></tr>
+  </table>
+
+  <h3>FAQ</h3>
+
+  <h4>Can I run the classic bot and the hub at the same time?</h4>
+  <p>Yes. They are independent transports in one process. The classic bot uses Baileys; hub agents use official tokens and OpenCode. They share the dashboard, SQLite, knowledge, and MCP server definitions, but not conversations or model sessions.</p>
+
+  <h4>Can two hub agents share one official token?</h4>
+  <p>No. One token maps to one active poller. Use a separate token for each agent/number. Sharing a token produces HTTP 409 and ambiguous ownership.</p>
+
+  <h4>How many hub agents can I run?</h4>
+  <p>There is no hard-coded agent limit. Capacity is bounded by the official API limits, model cost, OpenCode CPU/memory, and your ability to monitor the agents. Start with one, measure, then add.</p>
+
+  <h4>How do I move a classic number to the hub?</h4>
+  <p>Obtain an official token for the number, create a hub agent with the same prompt and knowledge, test it, then stop the classic poller and start the hub agent. Do not run both against the same number simultaneously.</p>
+
+  <h4>Does deleting an agent delete its WhatsApp messages?</h4>
+  <p>It removes the agent, token, bindings, skills, schedules, and sessions. Dashboard conversations and stored messages are separate records; delete them explicitly if required. Uploaded media remains in <code>data/uploads</code> until removed.</p>
+
+  <h4>Where is the OpenCode config?</h4>
+  <p><code>opencode.json</code> in the project root. The hash of the managed file is in <code>data/opencode-managed.json</code>. Backups of an unmanaged file use <code>opencode.json.bak-&lt;timestamp&gt;</code>.</p>
+
+  <h4>How do I rotate a token or API key?</h4>
+  <p>For a hub token, update the agent's token and restart its poller. For OpenRouter, update Settings or <code>.env</code> and restart. Keep the old value until the new one is verified, then revoke it.</p>
+
+  <h4>What if I lose <code>APP_SECRET</code>?</h4>
+  <p>Stored secrets cannot be decrypted. Recreate <code>.env</code> with a new secret, then re-enter the OpenRouter key and every WhatsApp token. The message database and knowledge remain, but encrypted fields do not.</p>
+</section>
+
+<!-- ================= APPENDIX A ================= -->
+<section class="section" id="appendix">
+  <div class="kicker">Reference · Appendix A</div>
+  <h2>Environment variables<span class="sub">The complete <code>.env</code> surface, with defaults and operational notes.</span></h2>
+
+  <p class="lead">
+    The app loads <code>.env</code> from the project root. Values already present in the process environment
+    take precedence in normal Node deployments; keep one source of truth when running under a service manager.
+  </p>
+
+  <table>
+    <tr><th style="width:26%">Variable</th><th style="width:19%">Default</th><th>Purpose and notes</th></tr>
+    <tr><td><code>PORT</code></td><td><code>8787</code></td><td>Dashboard and API port.</td></tr>
+    <tr><td><code>HOST</code></td><td><code>127.0.0.1</code></td><td>Bind address. Change only with a reverse proxy and firewall plan.</td></tr>
+    <tr><td><code>DATA_DIR</code></td><td><code>./data</code></td><td>SQLite, sessions, uploads, model cache, and the managed config hash.</td></tr>
+    <tr><td><code>ADMIN_PASSWORD</code></td><td>none</td><td>Required for dashboard login. Use a long, unique value.</td></tr>
+    <tr><td><code>APP_SECRET</code></td><td>none</td><td>AES-256-GCM key material for stored secrets. 24+ random characters. Changing it invalidates existing encrypted values.</td></tr>
+    <tr><td><code>OPENROUTER_API_KEY</code></td><td>none</td><td>Classic model calls and the OpenCode child environment. Can also be set in the dashboard, which stores it encrypted.</td></tr>
+    <tr><td><code>OPENROUTER_MODEL</code></td><td><code>openai/gpt-4.1-mini</code></td><td>Classic default model. New hub agents inherit it with <code>openrouter/</code> added.</td></tr>
+    <tr><td><code>OPENROUTER_BASE_URL</code></td><td><code>https://openrouter.ai/api/v1</code></td><td>OpenAI-compatible endpoint. Change only for a compatible gateway.</td></tr>
+    <tr><td><code>LOG_LEVEL</code></td><td><code>info</code></td><td>Logger verbosity. <code>debug</code> is useful for embeddings, MCP, and runtime diagnosis.</td></tr>
+    <tr><td><code>APP_URL</code></td><td><code>http://HOST:PORT</code></td><td>Base URL used by the TUI. Set it when HOST/PORT differ from the defaults.</td></tr>
+    <tr><td><code>OPENCODE_BIN</code></td><td><code>opencode</code></td><td>Executable name or full path. Use the full path when the service manager's PATH differs from your shell.</td></tr>
+    <tr><td><code>OPENCODE_PORT</code></td><td><code>4096</code></td><td>Base port for the managed OpenCode server. It tries a few following ports if busy.</td></tr>
+    <tr><td><code>WHATSAPP_AGENT_API_BASE</code></td><td><code>https://api.whatsapp.com/agent/v1</code></td><td>Official Agent Platform base URL. Override only for a compatible test environment.</td></tr>
+    <tr><td><code>VITE_API_BASE</code></td><td>empty</td><td>Development-only API base for the Vite client. Leave empty for the same-origin proxy.</td></tr>
+    <tr><td><code>NODE_ENV</code></td><td>unset</td><td><code>production</code> enables production-mode serving and logging behaviour. Set it under a process manager.</td></tr>
+  </table>
+
+  <div class="callout warn">
+    <span class="label">Secret-handling order</span>
+    <p>
+      Set <code>APP_SECRET</code> and <code>ADMIN_PASSWORD</code> before you store an OpenRouter key or any
+      hub token. If you rotate <code>APP_SECRET</code>, re-enter every encrypted secret and update the backup
+      set in the same maintenance window.
+    </p>
+  </div>
+
+  <h3>How values resolve</h3>
+  <ul>
+    <li><code>.env</code> is read at startup. A value already present in the process environment wins; restart after editing the file.</li>
+    <li>An OpenRouter key saved in <strong>Settings</strong> is encrypted in SQLite and takes precedence over <code>OPENROUTER_API_KEY</code>. Delete it in Settings to fall back to the environment value.</li>
+    <li>The classic model in <strong>Settings</strong> takes precedence over <code>OPENROUTER_MODEL</code>. Hub agents store their own model and do not follow this value after creation.</li>
+    <li><code>APP_SECRET</code> and <code>ADMIN_PASSWORD</code> have no dashboard override. Change them in <code>.env</code> and restart.</li>
+    <li><code>APP_URL</code> is used by the TUI and as the app's outbound referer; it is not a public tunnel.</li>
+  </ul>
+
+  <h3>Rotating a secret safely</h3>
+  <ol>
+    <li><strong>OpenRouter key:</strong> create the replacement, save and test it in Settings, then update or remove the old environment value. Restart the app so the managed OpenCode child receives the new key.</li>
+    <li><strong>Hub token:</strong> update the token on the agent, restart the poller, and send a real test message. Revoke the old token at the platform after the new one works.</li>
+    <li><strong>Admin password:</strong> change <code>ADMIN_PASSWORD</code>, restart, and sign in with the new value. Existing dashboard sessions may remain valid until they expire.</li>
+    <li><strong>APP_SECRET:</strong> stop the app, back up <code>.env</code> and <code>data/</code>, set the new secret, start, and re-enter every encrypted key and token. Old values cannot be recovered without the old secret.</li>
+    <li><strong>After any rotation:</strong> update the backup set and confirm that a restore would include the matching secret.</li>
+  </ol>
+
+  <h3>Common configuration mistakes</h3>
+  <table class="table-compact">
+    <tr><th style="width:32%">Mistake</th><th>Consequence</th><th>Fix</th></tr>
+    <tr><td><code>APP_SECRET</code> changed casually</td><td>Stored keys and tokens become unreadable.</td><td>Restore the old secret or re-enter every secret; do not run with a mismatch.</td></tr>
+    <tr><td>Old dashboard key left in place</td><td>The environment key appears configured but is ignored.</td><td>Delete the dashboard key in Settings, then retest.</td></tr>
+    <tr><td><code>OPENCODE_BIN</code> only on your shell PATH</td><td>The service manager starts the app but hub prompts fail.</td><td>Use the absolute path to <code>opencode.exe</code>.</td></tr>
+    <tr><td><code>HOST=0.0.0.0</code> without TLS</td><td>The dashboard and admin API are exposed in plaintext.</td><td>Bind localhost or put a TLS reverse proxy and source restrictions in front.</td></tr>
+  </table>
+</section>
+
+<!-- ================= APPENDIX B ================= -->
+<section class="section" id="appendix-b">
+  <div class="kicker">Reference · Appendix B</div>
+  <h2>Scripts, ports, and data map<span class="sub">Where the commands, processes, and files live.</span></h2>
+
+  <h3>npm scripts</h3>
+  <table>
+    <tr><th style="width:29%">Command</th><th>What it does</th></tr>
+    <tr><td><code>npm run dev</code></td><td>Starts the API (with watch mode) and the Vite dev server together.</td></tr>
+    <tr><td><code>npm run dev:server</code></td><td>API only, TypeScript watch mode.</td></tr>
+    <tr><td><code>npm run dev:client</code></td><td>Vite only; requires the API on port 8787.</td></tr>
+    <tr><td><code>npm run build</code></td><td>Builds the server to <code>dist/</code> and the dashboard to <code>public/admin/</code>.</td></tr>
+    <tr><td><code>npm run build:server</code></td><td>Server build only.</td></tr>
+    <tr><td><code>npm run build:web</code></td><td>Dashboard build only.</td></tr>
+    <tr><td><code>npm start</code></td><td>Runs the compiled server from <code>dist/index.js</code>.</td></tr>
+    <tr><td><code>npm run tui</code></td><td>Starts the terminal hub monitor against the running API.</td></tr>
+    <tr><td><code>npm run typecheck</code></td><td>Type-checks server and web without emitting files.</td></tr>
+    <tr><td><code>npm test</code></td><td>Runs the Node test suite in <code>test/</code>.</td></tr>
+    <tr><td><code>npm run setup</code></td><td>Runs the repository setup helper, if present.</td></tr>
+  </table>
+
+  <h3>Processes and ports</h3>
+  <table class="table-compact">
+    <tr><th style="width:26%">Process</th><th style="width:17%">Default</th><th>Started by</th></tr>
+    <tr><td>Express API + dashboard</td><td><code>:8787</code></td><td><code>npm start</code> or <code>npm run dev:server</code></td></tr>
+    <tr><td>Vite dev server</td><td><code>:5173</code></td><td><code>npm run dev</code> / <code>dev:client</code></td></tr>
+    <tr><td>Managed OpenCode</td><td><code>:4096</code>+</td><td>First hub prompt or agent start</td></tr>
+    <tr><td>MCP stdio servers</td><td>child processes</td><td>Enabled MCP servers, on demand</td></tr>
+    <tr><td>Classic WhatsApp socket</td><td>outbound</td><td>App startup (Baileys)</td></tr>
+  </table>
+
+  <h3>Data directory</h3>
+  <table>
+    <tr><th style="width:30%">Path</th><th>Contents</th></tr>
+    <tr><td><code>data/agent.sqlite</code></td><td>Settings, chats, messages, runs, knowledge, MCP servers, hub agents/tokens, skills, schedules, sessions.</td></tr>
+    <tr><td><code>data/agent.sqlite-wal</code> / <code>-shm</code></td><td>SQLite WAL and shared-memory files. Include them in live copies or use a proper backup.</td></tr>
+    <tr><td><code>data/wa-auth/</code></td><td>Classic Baileys session credentials. Sensitive.</td></tr>
+    <tr><td><code>data/models/</code></td><td>Hugging Face/Transformers cache for the local embedding model.</td></tr>
+    <tr><td><code>data/uploads/</code></td><td>Inbound hub media. Not deleted when a chat is deleted.</td></tr>
+    <tr><td><code>data/opencode-managed.json</code></td><td>Hash and path of the generated OpenCode config.</td></tr>
+    <tr><td><code>opencode.json</code></td><td>Generated runtime config at the project root. Contains prompts and MCP settings, not WhatsApp tokens.</td></tr>
+    <tr><td><code>opencode.json.bak-*</code></td><td>One-time backup of an unmanaged config that existed before the hub took over.</td></tr>
+    <tr><td><code>.opencode/skills/</code></td><td>Generated skill directories for hub agents (<code>wa-hub-*</code>).</td></tr>
+    <tr><td><code>.env</code></td><td>Environment secrets. Never commit or share.</td></tr>
+  </table>
+
+  <h3>Generated OpenCode shape</h3>
+  <p>The generated file follows this shape (values change with your agents):</p>
+  <pre class="code"><code>{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openrouter/openai/gpt-4.1-mini",
+  "mcp": {
+    "servers": {
+      "filesystem": {
+        "type": "local",
+        "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "./data"],
+        "codemode": false
+      }
+    }
+  },
+  "agents": {
+    "wa_hub_&lt;id&gt;": {
+      "description": "WhatsApp agent: Customer Support",
+      "mode": "primary",
+      "model": "openrouter/openai/gpt-4.1-mini",
+      "system": "...base prompt + agent prompt + skills...",
+      "steps": 12,
+      "permissions": [
+        { "action": "filesystem_*", "resource": "*", "effect": "deny" }
+      ]
+    }
+  }
+}</code></pre>
+  <p class="small">
+    The example deny block is what an <em>unbound</em> agent receives. A bound agent does not get the deny
+    rules for that server. Do not copy this file into another project; regenerate it from the dashboard.
+  </p>
+</section>
+
+<!-- ================= APPENDIX C ================= -->
+<section class="section" id="appendix-c">
+  <div class="kicker">Reference · Appendix C</div>
+  <h2>Cron, models, and API limits<span class="sub">The small reference tables worth keeping next to the dashboard.</span></h2>
+
+  <h3>Cron examples</h3>
+  <table class="table-compact">
+    <tr><th style="width:20%">Expression</th><th>Meaning</th></tr>
+    <tr><td><code>0 9 * * *</code></td><td>Every day at 09:00.</td></tr>
+    <tr><td><code>0 8 * * 1-5</code></td><td>Weekdays at 08:00.</td></tr>
+    <tr><td><code>30 17 * * 5</code></td><td>Fridays at 17:30.</td></tr>
+    <tr><td><code>0 */2 * * *</code></td><td>Every two hours on the hour.</td></tr>
+    <tr><td><code>15 7 1 * *</code></td><td>The first day of each month at 07:15.</td></tr>
+    <tr><td><code>0 9 * * 1</code></td><td>Mondays at 09:00.</td></tr>
+  </table>
+  <p class="small">Five-field cron: minute, hour, day of month, month, day of week. Expressions are validated when saved. The timezone comes from <strong>Settings</strong>; an empty value uses the server's local zone.</p>
+
+  <h3>Model identifiers</h3>
+  <table class="table-compact">
+    <tr><th style="width:42%">Example</th><th>Notes</th></tr>
+    <tr><td><code>openrouter/openai/gpt-4.1-mini</code></td><td>OpenRouter model with the required OpenCode provider prefix.</td></tr>
+    <tr><td><code>openrouter/anthropic/claude-sonnet-4</code></td><td>Provider family and model id.</td></tr>
+    <tr><td><code>openrouter/google/gemini-2.5-flash</code></td><td>Useful for fast, lower-cost replies.</td></tr>
+    <tr><td><code>openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free</code></td><td>Free models can work for smoke tests; expect rate limits and variable tool use.</td></tr>
+  </table>
+  <p class="small">Use a model your OpenRouter key can access. Hub models are not read from <code>OPENROUTER_MODEL</code> after creation; edit the agent to change them.</p>
+
+  <h3>Operational constants</h3>
+  <table>
+    <tr><th style="width:42%">Constant</th><th>Value</th></tr>
+    <tr><td>Official API documented caps</td><td>12 sends, 12 status, 15 polls, 12 media per minute, per agent</td></tr>
+    <tr><td>Applied internal caps</td><td>11 sends, 11 status, 14 polls, 11 media per minute</td></tr>
+    <tr><td>Poll offset</td><td>64-bit value stored in SQLite</td></tr>
+    <tr><td>Hub message dedupe</td><td><code>hub_messages</code> keyed by message id</td></tr>
+    <tr><td>Long reply split</td><td>About 3,500 characters per WhatsApp message</td></tr>
+    <tr><td>Hub media skip threshold</td><td>20 MB per inbound file</td></tr>
+    <tr><td>Dashboard upload limit</td><td>25 MB per file; supported text/document types</td></tr>
+    <tr><td>OpenCode agent steps</td><td>Up to 12 per prompt</td></tr>
+    <tr><td>Test prompt context</td><td><code>test</code> session key</td></tr>
+    <tr><td>Schedule context</td><td><code>schedule</code> session key</td></tr>
+    <tr><td>Customer context</td><td>One session per agent + sender id</td></tr>
+    <tr><td>Fallback reply</td><td>“Sorry, I could not handle that message right now. Please try again in a moment.”</td></tr>
+    <tr><td>Poll collision</td><td>HTTP 409 — another poller owns the token</td></tr>
+  </table>
+
+  <h3>Status codes you will see</h3>
+  <table class="table-compact">
+    <tr><th style="width:18%">Code</th><th>Meaning in this app</th></tr>
+    <tr><td><strong>400</strong></td><td>Validation or a user-actionable start/test error (no token, disabled agent, bad prompt, rejected config).</td></tr>
+    <tr><td><strong>401</strong></td><td>Dashboard authentication required, or an official API token was rejected.</td></tr>
+    <tr><td><strong>404</strong></td><td>Record/route not found; for a stale OpenCode session, the runtime clears it and creates a new one.</td></tr>
+    <tr><td><strong>409</strong></td><td>Another poller owns the official token.</td></tr>
+    <tr><td><strong>429</strong></td><td>Rate limited by the provider or the app's login/API limiter.</td></tr>
+    <tr><td><strong>500+</strong></td><td>Unhandled server, runtime, or upstream failure. Read the log; do not keep retrying blindly.</td></tr>
+  </table>
+
+  <h3>Tool naming</h3>
+  <p>
+    MCP tools are exposed with a normalized server prefix. A server named <code>filesystem</code> produces
+    names such as <code>filesystem_read_file</code>. Per-agent deny rules use <code>&lt;server&gt;_*</code>
+    and also block OpenCode's generic resource listing/reading for unbound servers. If a tool is missing,
+    check the server name, the binding, the enabled state, and the disabled-tools list before changing the model.
+  </p>
+</section>
+
+<!-- ================= GLOSSARY ================= -->
+<section class="section" id="glossary">
+  <div class="kicker">Reference · Glossary</div>
+  <h2>Glossary<span class="sub">The vocabulary used in the dashboard, the logs, and this guide.</span></h2>
+
+  <table>
+    <tr><th style="width:24%">Term</th><th>Meaning</th></tr>
+    <tr><td><strong>Agent</strong></td><td>A configured WhatsApp identity: token, model, system prompt, MCP bindings, knowledge, skills, and schedules. In the hub, each agent has its own generated OpenCode entry.</td></tr>
+    <tr><td><strong>Baileys</strong></td><td>The unofficial WhatsApp Web library used by the classic bot. Requires QR linking and carries account-risk caveats.</td></tr>
+    <tr><td><strong>Creator</strong></td><td>The first WhatsApp sender recorded for a hub agent. Schedules and test sends target this person until the agent is deleted or the record changes.</td></tr>
+    <tr><td><strong>Cron</strong></td><td>A five-field schedule expression (minute, hour, day of month, month, day of week) used by hub schedules.</td></tr>
+    <tr><td><strong>Embedding</strong></td><td>A numeric representation of text used for semantic search. This app computes embeddings locally with <code>all-MiniLM-L6-v2</code>.</td></tr>
+    <tr><td><strong>Fallback reply</strong></td><td>The short WhatsApp message sent when the hub cannot obtain a model reply. It is a symptom, not a fix; check the logs.</td></tr>
+    <tr><td><strong>Hub</strong></td><td>The multi-agent mode that uses official WhatsApp Agent Platform tokens and a managed OpenCode runtime.</td></tr>
+    <tr><td><strong>Knowledge</strong></td><td>Documents or text stored in SQLite, chunked and embedded for retrieval. Attach a subset to each hub agent.</td></tr>
+    <tr><td><strong>MCP</strong></td><td>Model Context Protocol. A standard way to expose tools and resources to an agent over stdio, SSE, or Streamable HTTP.</td></tr>
+    <tr><td><strong>Model provider</strong></td><td>The service that performs inference. This deployment normally uses OpenRouter, which forwards to an upstream provider.</td></tr>
+    <tr><td><strong>Offset</strong></td><td>The official API cursor that tracks which messages have been consumed. Stored as a 64-bit value per agent.</td></tr>
+    <tr><td><strong>OpenCode</strong></td><td>The agent runtime used by the hub. The app spawns <code>opencode serve</code>, generates its config, and runs prompts through its HTTP API.</td></tr>
+    <tr><td><strong>Poller</strong></td><td>The per-agent loop that long-polls the official API for new messages. One active poller per token.</td></tr>
+    <tr><td><strong>RAG</strong></td><td>Retrieval-augmented generation: search relevant knowledge first, then include the passages in the model prompt.</td></tr>
+    <tr><td><strong>Session</strong></td><td>The model's conversation memory. Hub sessions are keyed by agent and sender, with separate test and schedule keys.</td></tr>
+    <tr><td><strong>Skill</strong></td><td>A reusable Markdown instruction block attached to an agent and written into its generated OpenCode prompt.</td></tr>
+    <tr><td><strong>System prompt</strong></td><td>The agent's standing brief: role, tone, constraints, and escalation rules. The runtime adds a WhatsApp-specific base prompt.</td></tr>
+    <tr><td><strong>Token</strong></td><td>In this guide, usually the official per-agent WhatsApp credential. Also used for the dashboard session cookie; context makes it clear.</td></tr>
+    <tr><td><strong>Tool call</strong></td><td>A model-requested action handled by an MCP server. Tools can read data or cause real-world effects; permission is an admin decision.</td></tr>
+    <tr><td><strong>Transport</strong></td><td>The path messages take: classic Baileys or the official WhatsApp Agent Platform.</td></tr>
+    <tr><td><strong>TUI</strong></td><td>The terminal UI started with <code>npm run tui</code> for monitoring and start/stop/reset actions.</td></tr>
+  </table>
+
+  <hr class="rule" />
+
+  <div class="about-hero" style="margin-top:8mm">
+    <h3>Keep this guide with the deployment</h3>
+    <p>
+      Replace the placeholder branding when the kit is ready. Update the screenshots when the dashboard
+      changes, and keep the environment table in sync with <code>.env.example</code>. A guide that describes
+      a system you no longer run is worse than no guide at all.
+    </p>
+    <div class="placeholder-note">
+      WhatsApp Agent · User &amp; Administrator Guide · Edition 1.0 · October 2026 · Placeholder brand.
+    </div>
+  </div>
+
+  <p class="footnote">
+    WhatsApp is a trademark of WhatsApp LLC. This project is not affiliated with WhatsApp, Meta, OpenRouter,
+    or OpenCode. Model names and platform behaviour belong to their respective owners and may change.
+  </p>
+</section>
+
+</body>
+</html>

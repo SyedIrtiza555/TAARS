@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+public/admin/assets/
+
+# Data / local state
+data/
+.env
+
+# Docs build artifacts
+docs/guide/_build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Keep examples
+!.env.example
