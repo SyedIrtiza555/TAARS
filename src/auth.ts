@@ -76,7 +76,7 @@ export function checkPassword(candidate: string): boolean {
   const stored = loadStoredAuth();
   if (stored) {
     const salt = Buffer.from(stored.salt, 'base64');
-    const left = Buffer.from(scryptHash(candidate, salt));
+    const left = Buffer.from(scryptHash(candidate, salt), 'base64');
     const right = Buffer.from(stored.hash, 'base64');
     return left.length === right.length && crypto.timingSafeEqual(left, right);
   }
