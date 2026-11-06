@@ -441,7 +441,12 @@ export class MemoryService {
     });
 
     const longTerm = scored
-      .filter((item) => item.relevance >= 0.25 || item.importance >= 5)
+      .filter(
+        (item) =>
+          item.relevance >= 0.25 ||
+          item.importance >= 5 ||
+          (item.source === 'manual' && item.importance >= 4),
+      )
       .sort((a, b) => b.score - a.score)
       .slice(0, Math.max(1, limit));
 
