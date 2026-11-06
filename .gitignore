@@ -7,6 +7,7 @@ public/admin/assets/
 
 # Data / local state
 data/
+data-hosted/
 .env
 
 # Docs build artifacts
