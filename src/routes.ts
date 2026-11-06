@@ -14,7 +14,10 @@ import {
   readSession,
   recordLoginFailure,
   requireAuth,
+  sealLegacyPasswordAfterLogin,
   sessionCookie,
+  setAdminPassword,
+  setupRequired,
   verifySession,
   originGuard,
 } from './auth.js';
@@ -157,8 +160,33 @@ export function createRouter() {
   router.use(originGuard);
 
   /* ---------------- public auth ---------------- */
+  router.get('/auth/me', (_req, res) => {
+    return respond(res, 200, {
+      authenticated: verifySession(readSession(_req)),
+      setupRequired: setupRequired(),
+    });
+  });
+
+  router.post('/auth/setup', asyncRoute(async (req, res) => {
+    if (!setupRequired()) {
+      return nextHttpError(res, 403, 'An admin password already exists. Use change password instead.');
+    }
+    const ip = extractClientIp(req);
+    if (loginRateLimited(ip)) return nextHttpError(res, 429, 'Too many attempts. Try again in 15 minutes.');
+    const { password } = req.body as { password?: unknown };
+    if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
+      return nextHttpError(res, 400, 'Password must be 8–200 characters.');
+    }
+    setAdminPassword(password);
+    clearLoginFailures(ip);
+    res.setHeader('Set-Cookie', sessionCookie(issueSession()));
+    return respond(res, 200, { ok: true });
+  }));
+
   router.post('/auth/login', asyncRoute(async (req, res) => {
-    if (!config.adminPassword) return nextHttpError(res, 503, 'ADMIN_PASSWORD is not configured on this server.');
+    if (setupRequired()) {
+      return nextHttpError(res, 503, 'No admin password exists yet. Complete the first-run setup.');
+    }
     const ip = extractClientIp(req);
     if (loginRateLimited(ip)) return nextHttpError(res, 429, 'Too many login attempts. Try again in 15 minutes.');
     const { password } = req.body as { password?: string };
@@ -168,6 +196,21 @@ export function createRouter() {
       return nextHttpError(res, 401, 'Invalid password.');
     }
     clearLoginFailures(ip);
+    sealLegacyPasswordAfterLogin();
+    res.setHeader('Set-Cookie', sessionCookie(issueSession()));
+    return respond(res, 200, { ok: true });
+  }));
+
+  router.post('/auth/change-password', asyncRoute(async (req, res) => {
+    if (setupRequired()) return nextHttpError(res, 503, 'No admin password exists yet. Complete the first-run setup.');
+    const { currentPassword, newPassword } = req.body as { currentPassword?: unknown; newPassword?: unknown };
+    if (typeof currentPassword !== 'string' || !checkPassword(currentPassword)) {
+      return nextHttpError(res, 401, 'Current password is incorrect.');
+    }
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 200) {
+      return nextHttpError(res, 400, 'New password must be 8–200 characters.');
+    }
+    setAdminPassword(newPassword); // bumps the auth version → invalidates every session
     res.setHeader('Set-Cookie', sessionCookie(issueSession()));
     return respond(res, 200, { ok: true });
   }));
@@ -175,10 +218,6 @@ export function createRouter() {
   router.post('/auth/logout', asyncRoute(async (_req, res) => {
     res.setHeader('Set-Cookie', clearSessionCookie());
     return respond(res, 200, { ok: true });
-  }));
-
-  router.get('/auth/me', asyncRoute(async (req, res) => {
-    return respond(res, 200, { authenticated: verifySession(readSession(req)) });
   }));
 
   /* ---------------- protected routes ---------------- */

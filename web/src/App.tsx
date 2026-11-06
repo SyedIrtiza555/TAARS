@@ -79,6 +79,7 @@ function useStatus(enabled: boolean) {
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState>('checking');
+  const [setupRequired, setSetupRequired] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [page, setPage] = useState<PageKey>(pageFromHash);
@@ -106,12 +107,16 @@ export default function App() {
   useEffect(() => {
     let alive = true;
     api
-      .get<{ authenticated: boolean }>('/auth/me')
+      .get<{ authenticated: boolean; setupRequired?: boolean }>('/auth/me')
       .then((response) => {
-        if (alive) setAuth(response.authenticated ? 'in' : 'out');
+        if (!alive) return;
+        setSetupRequired(response.setupRequired ?? false);
+        setAuth(response.authenticated ? 'in' : 'out');
       })
       .catch(() => {
-        if (alive) setAuth('out');
+        if (!alive) return;
+        setSetupRequired(false);
+        setAuth('out');
       });
     return () => {
       alive = false;
@@ -134,10 +139,15 @@ export default function App() {
     setLoginBusy(true);
     setLoginError('');
     try {
-      await api.post('/auth/login', { password });
+      if (setupRequired) {
+        await api.post('/auth/setup', { password });
+        setSetupRequired(false);
+      } else {
+        await api.post('/auth/login', { password });
+      }
       setAuth('in');
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'Login failed');
+      setLoginError(error instanceof Error ? error.message : 'Request failed');
     } finally {
       setLoginBusy(false);
     }
@@ -168,7 +178,14 @@ export default function App() {
   }
 
   if (auth === 'out') {
-    return <Login onSubmit={(password) => void login(password)} error={loginError} busy={loginBusy} />;
+    return (
+      <Login
+        onSubmit={(password) => void login(password)}
+        error={loginError}
+        busy={loginBusy}
+        setupRequired={setupRequired}
+      />
+    );
   }
 
   return (

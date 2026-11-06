@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Brain, Check, Eye, EyeOff, KeyRound, Loader2, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { Brain, Check, Eye, EyeOff, KeyRound, Loader2, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '../components/ui';
 import { CheckRow, Field, PageHeader } from '../components/common';
 import type { Notify } from '../components/common';
@@ -63,6 +63,8 @@ export function SettingsPage(props: {
   const [keyInput, setKeyInput] = useState('');
   const [keyVisible, setKeyVisible] = useState(false);
   const [keyBusy, setKeyBusy] = useState<'save' | 'test' | 'remove' | null>(null);
+  const [pwState, setPwState] = useState({ current: '', next: '', confirm: '' });
+  const [pwBusy, setPwBusy] = useState(false);
 
   const base = useMemo(() => (settings.data ? buildForm(settings.data.settings) : null), [settings.data]);
 
@@ -147,6 +149,23 @@ export function SettingsPage(props: {
       props.notify(error instanceof Error ? error.message : 'Could not remove key', 'error');
     } finally {
       setKeyBusy(null);
+    }
+  };
+
+  const changePassword = async () => {
+    if (pwBusy) return;
+    setPwBusy(true);
+    try {
+      await api.post('/auth/change-password', {
+        currentPassword: pwState.current,
+        newPassword: pwState.next,
+      });
+      setPwState({ current: '', next: '', confirm: '' });
+      props.notify('Admin password updated. Other devices were signed out.', 'success');
+    } catch (error) {
+      props.notify(error instanceof Error ? error.message : 'Could not change the password', 'error');
+    } finally {
+      setPwBusy(false);
     }
   };
 
@@ -276,6 +295,58 @@ export function SettingsPage(props: {
               <Field label="Memories per prompt" hint="How many long-term memories are injected into each reply.">
                 <Input type="number" min={1} max={30} value={form.memoryRetrieveLimit} onChange={(event) => set('memoryRetrieveLimit', event.target.value)} className="max-w-48 font-mono text-xs" />
               </Field>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="xl:col-span-2">
+          <CardHeader className="flex-row items-center gap-2 space-y-0">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <CardTitle className="text-base">Security</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Change the admin password. The new value is stored as an encrypted scrypt hash only — all other
+              sessions are signed out.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Current password">
+                <Input
+                  type="password"
+                  value={pwState.current}
+                  onChange={(event) => setPwState((state) => ({ ...state, current: event.target.value }))}
+                  autoComplete="current-password"
+                />
+              </Field>
+              <Field label="New password" hint="Minimum 8 characters.">
+                <Input
+                  type="password"
+                  value={pwState.next}
+                  onChange={(event) => setPwState((state) => ({ ...state, next: event.target.value }))}
+                  autoComplete="new-password"
+                />
+              </Field>
+              <Field label="Confirm new password">
+                <Input
+                  type="password"
+                  value={pwState.confirm}
+                  onChange={(event) => setPwState((state) => ({ ...state, confirm: event.target.value }))}
+                  autoComplete="new-password"
+                />
+              </Field>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                size="sm"
+                disabled={pwBusy || pwState.next.length < 8 || pwState.next !== pwState.confirm || !pwState.current}
+                onClick={() => void changePassword()}
+              >
+                {pwBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                Update password
+              </Button>
+              {pwState.next && pwState.next !== pwState.confirm && (
+                <span className="text-xs text-amber-300">Passwords do not match.</span>
+              )}
             </div>
           </CardContent>
         </Card>

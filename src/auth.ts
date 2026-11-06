@@ -1,9 +1,12 @@
 import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { config } from './config.js';
+import { getSecret, setSecret } from './secrets.js';
 
 const COOKIE_NAME = 'wa_agent_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PASSWORD_KEY = 'admin_password_auth';
+const AUTH_VERSION_KEY = 'admin_auth_version';
 const loginAttempts = new Map<string, number[]>();
 
 function sessionSecret(): Buffer {
@@ -14,16 +17,88 @@ function sign(value: string): string {
   return crypto.createHmac('sha256', sessionSecret()).update(value).digest('base64url');
 }
 
+/* ------------------------------------------------------------------ */
+/* Admin password: scrypt hash in the encrypted secrets store.          */
+/* Sessions carry the auth version so password changes log everyone out. */
+/* ------------------------------------------------------------------ */
+
+type StoredAuth = { salt: string; hash: string };
+
+function loadStoredAuth(): StoredAuth | null {
+  const raw = getSecret(PASSWORD_KEY);
+  if (!raw) return null;
+  const [version, saltB64, hashB64] = raw.split('|');
+  if (version !== 'v1' || !saltB64 || !hashB64) return null;
+  return { salt: saltB64, hash: hashB64 };
+}
+
+let authVersionCache: number | null = null;
+
+function authVersion(): number {
+  if (authVersionCache !== null) return authVersionCache;
+  const raw = getSecret(AUTH_VERSION_KEY);
+  const value = raw ? Number.parseInt(raw, 10) : 1;
+  authVersionCache = Number.isFinite(value) && value > 0 ? value : 1;
+  return authVersionCache;
+}
+
+function scryptHash(password: string, salt: Buffer): string {
+  return crypto.scryptSync(password.normalize('NFKC'), salt, 64, { N: 16_384, r: 8, p: 1 }).toString('base64');
+}
+
+/** Sets or replaces the admin password (scrypt hash, encrypted at rest) and invalidates all sessions. */
+export function setAdminPassword(password: string): void {
+  const salt = crypto.randomBytes(16);
+  const record = `v1|${salt.toString('base64')}|${scryptHash(password, salt)}`;
+  setSecret(PASSWORD_KEY, record);
+  const next = authVersion() + 1;
+  setSecret(AUTH_VERSION_KEY, String(next));
+  authVersionCache = next;
+}
+
+export type AdminAuthMode = 'unset' | 'legacy-env' | 'stored-hash';
+
+export function adminAuthMode(): AdminAuthMode {
+  if (loadStoredAuth()) return 'stored-hash';
+  if (config.adminPassword) return 'legacy-env';
+  return 'unset';
+}
+
+export function adminPasswordConfigured(): boolean {
+  return adminAuthMode() !== 'unset';
+}
+
+export function setupRequired(): boolean {
+  return adminAuthMode() === 'unset';
+}
+
 export function checkPassword(candidate: string): boolean {
-  if (!config.adminPassword) return false;
-  const left = crypto.createHash('sha256').update(candidate).digest();
-  const right = crypto.createHash('sha256').update(config.adminPassword).digest();
-  return crypto.timingSafeEqual(left, right);
+  const stored = loadStoredAuth();
+  if (stored) {
+    const salt = Buffer.from(stored.salt, 'base64');
+    const left = Buffer.from(scryptHash(candidate, salt));
+    const right = Buffer.from(stored.hash, 'base64');
+    return left.length === right.length && crypto.timingSafeEqual(left, right);
+  }
+  if (config.adminPassword) {
+    const left = crypto.createHash('sha256').update(candidate).digest();
+    const right = crypto.createHash('sha256').update(config.adminPassword).digest();
+    return crypto.timingSafeEqual(left, right);
+  }
+  return false;
+}
+
+/** One-time migration: after a successful login against the .env password, seal that
+ *  password into an encrypted hash so the plaintext does not need to stay in .env. */
+export function sealLegacyPasswordAfterLogin(): void {
+  if (adminAuthMode() === 'legacy-env' && config.adminPassword) {
+    setAdminPassword(config.adminPassword);
+  }
 }
 
 export function issueSession(): string {
   const payload = Buffer.from(
-    JSON.stringify({ sub: 'admin', iat: Date.now(), exp: Date.now() + SESSION_TTL_MS }),
+    JSON.stringify({ sub: 'admin', iat: Date.now(), exp: Date.now() + SESSION_TTL_MS, ver: authVersion() }),
   ).toString('base64url');
   return `${payload}.${sign(payload)}`;
 }
@@ -39,8 +114,17 @@ export function verifySession(token: string | undefined): boolean {
     return false;
   }
   try {
-    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { sub?: string; exp?: number };
-    return data.sub === 'admin' && typeof data.exp === 'number' && data.exp > Date.now();
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      sub?: string;
+      exp?: number;
+      ver?: number;
+    };
+    return (
+      data.sub === 'admin' &&
+      typeof data.exp === 'number' &&
+      data.exp > Date.now() &&
+      data.ver === authVersion()
+    );
   } catch {
     return false;
   }
