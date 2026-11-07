@@ -1,7 +1,7 @@
 # Boots the hosted (fresh) instance of the Agent Manager and exposes it through
 # a free Cloudflare quick tunnel.
 #
-# First visit to the printed URL asks you to create the admin password —
+# First visit to the printed URL asks you to create the admin password --
 # no plaintext secrets are ever written to any file by hand.
 #
 # Requires: cloudflared (winget install --id Cloudflare.cloudflared -e)
@@ -16,10 +16,9 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent $envFile) | Out-Nu
 if (-not (Test-Path $envFile)) {
     $example = Join-Path $PSScriptRoot 'hosted.env.example'
     if (-not (Test-Path $example)) { throw 'deploy/hosted.env.example is missing.' }
-    $content = Get-Content $example -Raw
-    $content = $content -replace '(?m)^#.*\r?\n', ''
-    Set-Content -Path $envFile -Value $content -Encoding ASCII
-    Write-Host "[ok] created $envFile (no secrets inside — they are set in the browser/DB)"
+    $lines = Get-Content $example | Where-Object { $_ -notmatch '^#' -and $_.Trim() -ne '' }
+    Set-Content -Path $envFile -Value $lines -Encoding ASCII
+    Write-Host "[ok] created $envFile (no secrets inside -- they are set in the browser/DB)"
 }
 
 # 2. Server: start if not already running
@@ -42,15 +41,21 @@ if (-not $listen) {
 
 # 3. Cloudflare quick tunnel
 $log = "$env:TEMP\taars-tunnel.log"
-Remove-Item $log, "$env:TEMP\taars-tunnel-err.log" -ErrorAction SilentlyContinue
+$errLog = "$env:TEMP\taars-tunnel-err.log"
+Remove-Item $log, $errLog -ErrorAction SilentlyContinue
 Start-Process -FilePath 'cloudflared' -ArgumentList 'tunnel', '--url', "http://127.0.0.1:$port" -WindowStyle Hidden `
-    -RedirectStandardOutput $log -RedirectStandardError "$env:TEMP\taars-tunnel-err.log"
+    -RedirectStandardOutput $log -RedirectStandardError $errLog
 
+# cloudflared prints its startup banner to stderr, so scan both captures
 $url = $null
-for ($i = 0; $i -lt 30; $i++) {
+for ($i = 0; $i -lt 45; $i++) {
     Start-Sleep -Seconds 2
-    if (Test-Path $log) {
-        $hit = Select-String -Path $log -Pattern 'https://[a-z0-9-]+\.trycloudflare\.com' | Select-Object -First 1
+    $files = @()
+    if (Test-Path $log) { $files += $log }
+    if (Test-Path $errLog) { $files += $errLog }
+    if ($files.Count -gt 0) {
+        $hit = Select-String -Path $files -Pattern 'https://[a-z0-9-]+\.trycloudflare\.com' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
         if ($hit) { $url = $hit.Matches[0].Value; break }
     }
 }
@@ -63,5 +68,5 @@ if ($url) {
     Write-Host 'First visit: create the admin password in the browser,'
     Write-Host 'then add your OpenRouter key in Settings.'
 } else {
-    Write-Host '[!] Tunnel URL not found yet. Check %TEMP%\taars-tunnel.log'
+    Write-Host '[!] Tunnel URL not found yet. Check %TEMP%\taars-tunnel-err.log / taars-tunnel.log'
 }
